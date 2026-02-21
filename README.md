@@ -1,5 +1,7 @@
 # pylistall
 
+[中文说明](README.zh-CN.md)
+
 `pylistall` is a cross-platform command-line tool that collects file contents under a directory and copies them to the system clipboard in a structured format.
 
 It also prints the absolute path and a tree-style directory structure. If the directory contains a `.git` repository, it can optionally include the Git commit log.
