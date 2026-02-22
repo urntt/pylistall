@@ -1,5 +1,9 @@
 # pylistall
 
+[![PyPI version](https://img.shields.io/pypi/v/pylistall.svg)](https://pypi.org/project/pylistall/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pylistall.svg)](https://pypi.org/project/pylistall/)
+[![License](https://img.shields.io/github/license/urntt/pylistall.svg)](https://github.com/urntt/pylistall)
+
 [English](README.md)
 
 `pylistall` 是一个跨平台命令行工具，用于收集指定目录下的文件内容，并以结构化格式复制到系统剪贴板。
@@ -64,10 +68,8 @@ pylistall [path] [options]
 示例：
 
 ````text
-ROOT: /Users/example/project
-
-TREE:
-.
+STRUCTURE:
+/Users/example/project
 ├── main.py
 └── utils.py
 

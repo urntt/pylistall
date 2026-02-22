@@ -270,7 +270,7 @@ def sort_tree(node: TreeNode) -> None:
 
 def render_tree(node: TreeNode, recursive: bool) -> str:
     """Render a TreeNode as a tree-like string."""
-    lines: list[str] = ["."]
+    lines: list[str] = []
     if not recursive:
         for index, filename in enumerate(node.files):
             is_last = index == (len(node.files) - 1)
@@ -366,9 +366,12 @@ def build_output(
     tree_text = render_tree(build_tree(selected, recursive), recursive)
 
     chunks: list[str] = []
-    chunks.append(f"ROOT: {root.resolve()}\n\n")
-    chunks.append("TREE:\n")
-    chunks.append(f"{tree_text}\n\n")
+    chunks.append("STRUCTURE:\n")
+    chunks.append(f"{root.resolve()}\n")
+    if tree_text:
+        chunks.append(f"{tree_text}\n\n")
+    else:
+        chunks.append("(empty)\n\n")
 
     if git_log_requested(git_log_count):
         chunks.append("GIT LOG:\n")
@@ -376,7 +379,8 @@ def build_output(
             assert git_log_count is not None
             chunks.append(f"{get_git_log(root, git_log_count)}\n\n")
         else:
-            chunks.append("[No .git directory found under ROOT]\n\n")
+            chunks.append(f"[No .git directory " +
+                          f"found under {root.resolve()}]\n\n")
 
     for item in selected:
         content = read_text(item.absolute_path, max_bytes=max_bytes)

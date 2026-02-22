@@ -1,5 +1,9 @@
 # pylistall
 
+[![PyPI version](https://img.shields.io/pypi/v/pylistall.svg)](https://pypi.org/project/pylistall/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pylistall.svg)](https://pypi.org/project/pylistall/)
+[![License](https://img.shields.io/github/license/urntt/pylistall.svg)](https://github.com/urntt/pylistall)
+
 [中文说明](README.zh-CN.md)
 
 `pylistall` is a cross-platform command-line tool that collects file contents under a directory and copies them to the system clipboard in a structured format.
@@ -64,10 +68,8 @@ If `path` is not provided, the current directory (`.`) is used.
 Example:
 
 ````text
-ROOT: /Users/example/project
-
-TREE:
-.
+STRUCTURE:
+/Users/example/project
 ├── main.py
 └── utils.py
 

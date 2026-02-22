@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pylistall"
-version = "0.2.0"
+version = "0.2.1"
 description = "Copy file contents under a directory to clipboard with tree and optional git log."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -20,3 +20,8 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.urls]
+Homepage = "https://github.com/urntt/pylistall"
+Repository = "https://github.com/urntt/pylistall"
+Issues = "https://github.com/urntt/pylistall/issues"
