@@ -38,6 +38,7 @@ def _build_output(
     chunks: list[str] = []
 
     # 1) Root + tree (tree is independent from all filters except -r)
+    #    Uses 10 backticks as fence
     chunks.append(f"{root.resolve()}\n")
     tree_text = build_tree_text(root=root, recursive=selection.recursive)
     if tree_text:
