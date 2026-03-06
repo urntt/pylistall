@@ -79,7 +79,8 @@ pylistall . -r -o -g
 
 示例输出：
 
-````text
+```````````text
+``````````
 /Users/example/project
 ├── .git/
 │   ├── HEAD
@@ -88,22 +89,23 @@ pylistall . -r -o -g
 ├── src/
 │   └── main.py
 └── README.txt
+``````````
 
 /Users/example/project/.git
 a1b2c3d (HEAD -> main) Initial commit
 
 `README.txt`:
 
-```
+``````````
 This is an exmaple Project.
-```
+``````````
 
 `src/main.py`:
 
-```
+``````````
 print("Hello World!")
-```
-````
+``````````
+```````````
 
 注意事项：
 
@@ -117,6 +119,8 @@ print("Hello World!")
 
 ### 递归遍历
 
+**可选，默认禁用。**
+
 ```bash
 -r, --recursive
 ```
@@ -129,11 +133,11 @@ print("Hello World!")
 * 会复制以上所有文件夹里的文件内容。
 * 还会尝试在这些文件夹里寻找 Git 日志。
 
-**可选，默认禁用。**
-
 ---
 
 ### 打印复制的内容
+
+**可选，默认禁用。**
 
 ```bash
 -p, --print
@@ -141,11 +145,11 @@ print("Hello World!")
 
 把生成的全部复制内容输出到 stdout。
 
-**可选，默认禁用。**
-
 ---
 
 ### 仅包含指定文件
+
+**可选，可重复使用，默认禁用。**
 
 ```bash
 -i, --include PATTERN
@@ -155,14 +159,14 @@ print("Hello World!")
 
 当启用 `-i` 时：
 
-* 只有符合的文件文件会被复制文件内容（白名单模式）
+* 只有符合条件的文件会被包含到内容输出中
 * `-i` 可以强制包含二进制文件，即便没有 `-b`
-
-**可选，可重复使用，默认禁用。**
 
 ---
 
 ### 排除指定文件
+
+**可选，可重复使用，默认禁用。**
 
 ```bash
 -o, --omit [PATTERN]
@@ -182,11 +186,11 @@ print("Hello World!")
 pylistall -o -o "README.md,test_cases/*"
 ```
 
-**可选，可重复使用，默认禁用。**
-
 ---
 
-### 二进制文件
+### 包含二进制文件
+
+**可选，默认禁用。**
 
 ```bash
 -b, --binary [PATTERN]
@@ -219,11 +223,11 @@ pylistall -i "run.exe"
 
   `.png`，`.jpg`，`.jpeg`，`.gif`，`.webp`，`.bmp`，`.ico`，`.pdf`，`.zip`，`.rar`，`.7z`，`.tar`，`.gz`，`.bz2`，`.xz`，`.exe`，`.dll`，`.so`，`.dylib`，`.bin`，`.dat`，`.class`，`.jar`，`.pyc`，`.pyo`，`.woff`，`.woff2`，`.ttf`，`.otf`，`.mp3`，`.wav`，`.flac`，`.mp4`，`.mov`，`.mkv`，`.avi`，`.doc`，`.docx`
 
-**可选，默认禁用。**
-
 ---
 
 ### 包含 Git 日志
+
+**可选，默认禁用。**
 
 ```bash
 -g, --git-log [N]
@@ -249,20 +253,18 @@ pylistall -i "run.exe"
   * 他们会被以路径排序（大小写不敏感），以空行分隔。
   * 如果一个 `.git` 目录和一个 `.git` 文件在同一个文件夹里，则会先打印 `.git` 目录，再打印 `.git` 文件。
 
-**可选，默认禁用。**
-
 ---
 
 ### 限制文件读取大小
 
+**可选，默认禁用。**
+
 ```bash
---max-bytes N
+-m, --max-bytes N
 ```
 
 限制每个文件读取的最大字节数。
 如果文件内容超过了 `N` 字节，则会被截断并标记。
-
-**可选，默认禁用。**
 
 ---
 

@@ -41,7 +41,7 @@ def _build_output(
     chunks.append(f"{root.resolve()}\n")
     tree_text = build_tree_text(root=root, recursive=selection.recursive)
     if tree_text:
-        chunks.append(f"{tree_text}\n\n")
+        chunks.append(f"``````````\n{tree_text}\n``````````\n\n")
     else:
         chunks.append("(empty)\n\n")
 
@@ -200,8 +200,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     binary_policy = parse_binary_policy(args.binary)
 
-    git_options = GitLogOptions(enabled=args.git_log is not None,
-                                count=args.git_log)
+    git_options = GitLogOptions(
+        enabled=args.git_log is not None,
+        count=args.git_log
+    )
 
     result = _build_output(
         root=root,

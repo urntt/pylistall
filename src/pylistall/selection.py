@@ -325,8 +325,8 @@ def build_content_sections(
     for item in selected:
         content = read_text(item.absolute_path, max_bytes=selection.max_bytes)
         chunks.append(f"`{item.display_name}`:\n")
-        chunks.append("```\n")
+        chunks.append("``````````\n")
         chunks.append(f"{content}\n")
-        chunks.append("```\n\n")
+        chunks.append("``````````\n\n")
 
     return ("".join(chunks).rstrip() + "\n", len(selected))

@@ -79,7 +79,8 @@ pylistall . -r -o -g
 
 Example output:
 
-````text
+```````````text
+``````````
 /Users/example/project
 ├── .git/
 │   ├── HEAD
@@ -88,22 +89,23 @@ Example output:
 ├── src/
 │   └── main.py
 └── README.txt
+``````````
 
 /Users/example/project/.git
 a1b2c3d (HEAD -> main) Initial commit
 
 `README.txt`:
 
-```
-This is an exmaple Project.
-```
+``````````
+This is an example project.
+``````````
 
 `src/main.py`:
 
-```
+``````````
 print("Hello World!")
-```
-````
+``````````
+```````````
 
 Notes:
 
@@ -117,6 +119,8 @@ Notes:
 
 ### Recursive traversal
 
+**Optional, disabled by default.**
+
 ```bash
 -r, --recursive
 ```
@@ -129,11 +133,11 @@ When enabled:
 * Copied file content will include files in all these directories
 * Will try to find Git logs in all directories
 
-**Optional, disabled by default.**
-
 ---
 
 ### Print copied content
+
+**Optional, disabled by default.**
 
 ```bash
 -p, --print
@@ -141,11 +145,11 @@ When enabled:
 
 Print the full generated output to stdout.
 
-**Optional, disabled by default.**
-
 ---
 
 ### Include only specific files
+
+**Optional, repeatable, disabled by default.**
 
 ```bash
 -i, --include PATTERN
@@ -158,11 +162,11 @@ When `-i` is used:
 * Only matching files are included in content output (whitelist mode)
 * `-i` can force-include binary files even if `-b` is not provided
 
-**Optional, repeatable, disabled by default.**
-
 ---
 
 ### Omit specific files
+
+**Optional, repeatable, disabled by default.**
 
 ```bash
 -o, --omit [PATTERN]
@@ -182,22 +186,22 @@ Behavior:
 pylistall -o -o "README.md,test_cases/*"
 ```
 
-**Optional, repeatable, disabled by default.**
-
 ---
 
-### Binary files
+### Include binary files
+
+**Optional, disabled by default.**
 
 ```bash
 -b, --binary [PATTERN]
 ```
 
 Controls whether binary files are included in content output.
-Does not affact non-binary files.
+Does not affect non-binary files.
 
 Precedence rules:
 
-1. `-o` always omits matching files (including binariy files).
+1. `-o` always omits matching files (including binary files).
 2. `-i` can force-include specific binary files.
 3. `-b` controls only remaining binary files.
 
@@ -219,11 +223,11 @@ Default set of binary files:
 
   `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.ico`, `.pdf`, `.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.bz2`, `.xz`, `.exe`, `.dll`, `.so`, `.dylib`, `.bin`, `.dat`, `.class`, `.jar`, `.pyc`, `.pyo`, `.woff`, `.woff2`, `.ttf`, `.otf`, `.mp3`, `.wav`, `.flac`, `.mp4`, `.mov`, `.mkv`, `.avi`, `.doc`, `.docx`
 
-**Optional, disabled by default.**
-
 ---
 
 ### Git log
+
+**Optional, disabled by default.**
 
 ```bash
 -g, --git-log [N]
@@ -249,11 +253,11 @@ Rules:
   * They are sorted by path (case-insensitive), separated by blank lines.
   * If both a `.git` directory and a `.git` file exist at the same path, the directory is printed first and the file second.
 
-**Optional, disabled by default.**
-
 ---
 
 ### Limit file read size
+
+**Optional, disabled by default.**
 
 ```bash
 -m, --max-bytes N
@@ -261,8 +265,6 @@ Rules:
 
 Limit the maximum number of bytes read per file.
 If content exceeds `N` bytes, it is truncated and marked.
-
-**Optional, disabled by default.**
 
 ---
 
