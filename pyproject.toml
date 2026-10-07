@@ -12,6 +12,9 @@ license = {text = "MIT"}
 authors = [{name = "urntt"}]
 dependencies = ["pyperclip>=1.8"]
 
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
 [project.scripts]
 pylistall = "pylistall.cli:main"
 
@@ -25,3 +28,8 @@ where = ["src"]
 Homepage = "https://github.com/urntt/pylistall"
 Repository = "https://github.com/urntt/pylistall"
 Issues = "https://github.com/urntt/pylistall/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "--strict-markers", "-ra"]
+xfail_strict = true

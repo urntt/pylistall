@@ -180,6 +180,10 @@ Behavior:
   The default set includes:
   `.git/**`, `**/__pycache__/**`, `**/.pytest_cache/**`, `**/.mypy_cache/**`, `**/.ruff_cache/**`, `**/.tox/**`, `**/.venv/**`, `**/venv/**`, `**/build/**`, `**/dist/**`, `**/*.egg-info/**`, `**/node_modules/**`, `**/.idea/**`, `**/.vscode/**`, `**/.gitignore`, `**/.DS_Store`, `**/Thumbs.db`
 
+  Default patterns beginning with `**/` also apply at the target directory root.
+  For example, both `.venv/config.txt` and `nested/.venv/config.txt` are omitted.
+  Custom patterns retain their existing `fnmatch` matching behavior.
+
 * If both default and custom omit rules are desired, repeat `-o`:
 
 ```bash
@@ -329,3 +333,7 @@ Python 3.9 or higher
 ## License
 
 MIT License
+
+## Contributing
+
+See the [development guide](docs/development.md) for environment setup and tests.

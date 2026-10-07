@@ -11,7 +11,7 @@ from typing import Optional
 GIT_LOG_ALL: int = -1
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class GitLogOptions:
     """Options for git log output."""
 
@@ -19,7 +19,7 @@ class GitLogOptions:
     count: Optional[int]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class GitEntry:
     """A discovered .git entry."""
 

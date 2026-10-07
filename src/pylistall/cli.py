@@ -12,6 +12,7 @@ from pylistall.selection import (
     BinaryPolicy,
     SelectionOptions,
     build_content_sections,
+    flatten_patterns,
     parse_binary_policy,
     parse_omit_patterns,
 )
@@ -19,7 +20,7 @@ from pylistall.tree import build_tree_text
 from pylistall.util import copy_to_clipboard
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class OutputResult:
     """Represents the final output and metadata."""
 
@@ -195,7 +196,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     omit_patterns = parse_omit_patterns(args.omit)
     selection = SelectionOptions(
         recursive=bool(args.recursive),
-        include=args.include,
+        include=flatten_patterns(args.include),
         omit=omit_patterns,
         max_bytes=args.max_bytes,
     )

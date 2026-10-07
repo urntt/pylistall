@@ -180,6 +180,9 @@ print("Hello World!")
   默认忽略集包含：
   `.git/**`，`**/__pycache__/**`，`**/.pytest_cache/**`，`**/.mypy_cache/**`，`**/.ruff_cache/**`，`**/.tox/**`，`**/.venv/**`，`**/venv/**`，`**/build/**`，`**/dist/**`，`**/*.egg-info/**`，`**/node_modules/**`，`**/.idea/**`，`**/.vscode/**`，`**/.gitignore`，`**/.DS_Store`，`**/Thumbs.db`
 
+  以 `**/` 开头的默认规则也会作用于目标目录根层级。例如，`.venv/config.txt`
+  和 `nested/.venv/config.txt` 都会被排除。自定义模式保持现有的 `fnmatch` 匹配行为。
+
 * 如果想要在启用默认忽略集的同时忽略其他自定义规则，请重复使用 `-o`：
 
 ```bash
@@ -327,3 +330,7 @@ Python 3.9 或更高版本
 ## 许可证
 
 MIT License
+
+## 参与开发
+
+环境准备与测试方法见[开发指南](docs/development.zh-CN.md)。
