@@ -29,7 +29,8 @@ def test_platform_backend_receives_unicode(monkeypatch, platform, command, encod
 
 
 @pytest.mark.parametrize(
-    "error", [FileNotFoundError("xclip missing"), subprocess.CalledProcessError(1, "xclip")]
+    "error",
+    [FileNotFoundError("xclip missing"), subprocess.CalledProcessError(1, "xclip")],
 )
 def test_linux_falls_back_when_xclip_fails(monkeypatch, error):
     copied = []

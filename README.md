@@ -77,15 +77,14 @@ cd /Users/example/project
 pylistall . -r -o -g
 ```
 
-Example output:
+Example clipboard text:
 
 ```````````text
-``````````
 /Users/example/project
+``````````
 ├── .git/
-│   ├── HEAD
 │   ├── config
-│   └── ...
+│   └── HEAD
 ├── src/
 │   └── main.py
 └── README.txt
@@ -95,13 +94,11 @@ Example output:
 a1b2c3d (HEAD -> main) Initial commit
 
 `README.txt`:
-
 ``````````
 This is an example project.
 ``````````
 
 `src/main.py`:
-
 ``````````
 print("Hello World!")
 ``````````
@@ -143,7 +140,8 @@ When enabled:
 -p, --print
 ```
 
-Print the full generated output to stdout.
+Print the full generated output to stdout before copying it to the clipboard.
+This option still requires a working clipboard backend.
 
 ---
 
@@ -155,7 +153,8 @@ Print the full generated output to stdout.
 -i, --include PATTERN
 ```
 
-Include only files matching glob patterns, using Comma-separated patterns.
+Include only files matching glob patterns. Repeat the option or use comma-separated
+patterns; surrounding whitespace and empty entries are ignored.
 
 When `-i` is used:
 
@@ -172,7 +171,8 @@ When `-i` is used:
 -o, --omit [PATTERN]
 ```
 
-Exclude files matching glob patterns, using Comma-separated patterns.
+Exclude files matching glob patterns. Repeat the option or use comma-separated
+patterns; surrounding whitespace and empty entries are ignored.
 
 Behavior:
 
@@ -202,6 +202,8 @@ pylistall -o -o "README.md,test_cases/*"
 
 Controls whether binary files are included in content output.
 Does not affect non-binary files.
+Included bytes are decoded as UTF-8 with replacement; archives, images, and
+documents are not converted or extracted.
 
 Precedence rules:
 
@@ -253,9 +255,7 @@ Rules:
 * Each Git log group is prefixed with the absolute `.git` path.
 * Multiple `.git` are printed as separate groups.
 
-  When multiple `.git` entries are found:
-  * They are sorted by path (case-insensitive), separated by blank lines.
-  * If both a `.git` directory and a `.git` file exist at the same path, the directory is printed first and the file second.
+* Groups are sorted by path (case-insensitive), separated by blank lines.
 
 ---
 
@@ -304,7 +304,7 @@ Include only Python files:
 pylistall -i "*.py"
 ```
 
-Exclude all files that starts with `test_` in `test` folder:
+Exclude all files that start with `test_` in the `test` folder:
 
 ```bash
 pylistall -o "test/test_*"
@@ -322,6 +322,11 @@ Platform-specific clipboard backends:
 | Windows  | clip              |
 | Linux    | xclip / pyperclip |
 
+Normal collection needs a desktop clipboard backend. The tool does not
+automatically exclude secrets or confine symbolic links to the target directory.
+Review the files you select before sharing; current boundaries are documented in
+[architecture](docs/architecture.md#safety-boundaries-and-current-limitations).
+
 ---
 
 ## Requirements
@@ -336,4 +341,6 @@ MIT License
 
 ## Contributing
 
-See the [development guide](docs/development.md) for environment setup and tests.
+See the [development guide](docs/development.md) for setup, checks, builds, and
+contribution steps. Product direction is in the [vision](VISION.md); module
+responsibilities and data flow are in [architecture](docs/architecture.md).

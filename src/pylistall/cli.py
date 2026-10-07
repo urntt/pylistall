@@ -85,8 +85,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pylistall",
         description=(
-            "Copy directory file contents to clipboard "
-            "with tree and optional git log."
+            "Copy directory file contents to clipboard with tree and optional git log."
         ),
     )
     parser.add_argument(
@@ -202,10 +201,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     binary_policy = parse_binary_policy(args.binary)
 
-    git_options = GitLogOptions(
-        enabled=args.git_log is not None,
-        count=args.git_log
-    )
+    git_options = GitLogOptions(enabled=args.git_log is not None, count=args.git_log)
 
     result = _build_output(
         root=root,
@@ -220,8 +216,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("")
 
     copy_to_clipboard(result.text)
-    print(f"Copied to clipboard: {root.resolve()} "
-          f"(files: {result.file_count})")
+    print(f"Copied to clipboard: {root.resolve()} (files: {result.file_count})")
 
     for warning in result.warnings:
         print(f"Warning: {warning}")

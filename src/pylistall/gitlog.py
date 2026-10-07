@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-
 GIT_LOG_ALL: int = -1
 
 
@@ -60,8 +59,7 @@ def _sort_key(entry: GitEntry) -> tuple[str, int]:
     return (str(entry.git_path.resolve()).lower(), 0 if entry.is_dir else 1)
 
 
-def _find_git_entries(root: Path,
-                      recursive: bool) -> tuple[list[GitEntry], list[str]]:
+def _find_git_entries(root: Path, recursive: bool) -> tuple[list[GitEntry], list[str]]:
     """Find .git directories/files under root, depending on recursive mode."""
     warnings: list[str] = []
     entries: list[GitEntry] = []
@@ -69,8 +67,7 @@ def _find_git_entries(root: Path,
     if not recursive:
         git_path = root / ".git"
         if git_path.exists():
-            entries.append(GitEntry(git_path=git_path,
-                                    is_dir=git_path.is_dir()))
+            entries.append(GitEntry(git_path=git_path, is_dir=git_path.is_dir()))
         # Defensive: if a filesystem ever reports both, warn and treat as two
         # entries.
         if git_path.is_dir() and git_path.is_file():

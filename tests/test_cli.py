@@ -13,7 +13,9 @@ def copied(monkeypatch):
     return texts
 
 
-def test_default_command_uses_current_directory(tmp_path, write_file, monkeypatch, copied, capsys):
+def test_default_command_uses_current_directory(
+    tmp_path, write_file, monkeypatch, copied, capsys
+):
     write_file("main.py", "print('hello')")
     monkeypatch.chdir(tmp_path)
 
@@ -36,7 +38,9 @@ def test_print_preview_precedes_copy_confirmation(tmp_path, write_file, copied, 
 
 
 @pytest.mark.parametrize("kind", ["missing", "file"])
-def test_invalid_target_returns_error_without_copy(tmp_path, write_file, copied, capsys, kind):
+def test_invalid_target_returns_error_without_copy(
+    tmp_path, write_file, copied, capsys, kind
+):
     target = tmp_path / "target"
     if kind == "file":
         write_file("target", "not a directory")

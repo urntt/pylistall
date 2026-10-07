@@ -7,7 +7,9 @@ def test_missing_repository_has_no_log(tmp_path):
     assert gitlog.build_git_log_sections(tmp_path, recursive=True, count=2) == ("", [])
 
 
-def test_nonrecursive_search_only_reads_root_repository(tmp_path, write_file, monkeypatch):
+def test_nonrecursive_search_only_reads_root_repository(
+    tmp_path, write_file, monkeypatch
+):
     (tmp_path / ".git").mkdir()
     write_file("child/.git", "gitdir: elsewhere")
     calls = []
@@ -24,7 +26,9 @@ def test_nonrecursive_search_only_reads_root_repository(tmp_path, write_file, mo
     assert warnings == []
 
 
-def test_recursive_logs_group_git_directories_and_files(tmp_path, write_file, monkeypatch):
+def test_recursive_logs_group_git_directories_and_files(
+    tmp_path, write_file, monkeypatch
+):
     (tmp_path / "Z-repo" / ".git").mkdir(parents=True)
     write_file("a-repo/.git", "gitdir: elsewhere")
     calls = []

@@ -56,9 +56,9 @@ def test_default_omit_is_opt_in(tmp_path, write_file):
     write_file("main.py", "source")
 
     assert ".git/HEAD" in selected_names(tmp_path, recursive=True)
-    assert selected_names(
-        tmp_path, recursive=True, omit=parse_omit_patterns([""])
-    ) == ["main.py"]
+    assert selected_names(tmp_path, recursive=True, omit=parse_omit_patterns([""])) == [
+        "main.py"
+    ]
 
 
 def test_default_and_custom_omit_rules_combine(tmp_path, write_file):
@@ -78,9 +78,10 @@ def test_default_and_custom_omit_rules_combine(tmp_path, write_file):
 def test_omit_overrides_binary_and_include(tmp_path, write_file, binary):
     write_file("image.png", b"\x00\xff")
 
-    assert selected_names(
-        tmp_path, include=("*.png",), omit=("*.png",), binary=binary
-    ) == []
+    assert (
+        selected_names(tmp_path, include=("*.png",), omit=("*.png",), binary=binary)
+        == []
+    )
 
 
 def test_include_can_force_binary_without_binary_flag(tmp_path, write_file):
@@ -148,9 +149,9 @@ def test_default_omit_excludes_root_tooling_files(tmp_path, write_file):
         write_file(name, "tooling")
     write_file("main.py", "source")
 
-    assert selected_names(
-        tmp_path, recursive=True, omit=parse_omit_patterns([""])
-    ) == ["main.py"]
+    assert selected_names(tmp_path, recursive=True, omit=parse_omit_patterns([""])) == [
+        "main.py"
+    ]
 
 
 @pytest.mark.parametrize("prefix", ["", "nested/"])
@@ -171,9 +172,9 @@ def test_default_omit_covers_root_and_nested_tooling(
     write_file(prefix + tooling_path, "tooling")
     write_file("main.py", "source")
 
-    assert selected_names(
-        tmp_path, recursive=True, omit=parse_omit_patterns([""])
-    ) == ["main.py"]
+    assert selected_names(tmp_path, recursive=True, omit=parse_omit_patterns([""])) == [
+        "main.py"
+    ]
 
 
 def test_custom_double_star_pattern_keeps_existing_matching(tmp_path, write_file):

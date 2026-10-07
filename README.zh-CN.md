@@ -77,15 +77,14 @@ cd /Users/example/project
 pylistall . -r -o -g
 ```
 
-示例输出：
+剪贴板文本示例：
 
 ```````````text
-``````````
 /Users/example/project
+``````````
 ├── .git/
-│   ├── HEAD
 │   ├── config
-│   └── ...
+│   └── HEAD
 ├── src/
 │   └── main.py
 └── README.txt
@@ -95,13 +94,11 @@ pylistall . -r -o -g
 a1b2c3d (HEAD -> main) Initial commit
 
 `README.txt`:
-
 ``````````
-This is an exmaple Project.
+This is an example project.
 ``````````
 
 `src/main.py`:
-
 ``````````
 print("Hello World!")
 ``````````
@@ -143,7 +140,8 @@ print("Hello World!")
 -p, --print
 ```
 
-把生成的全部复制内容输出到 stdout。
+在复制到剪贴板之前，把生成的全部内容输出到 stdout。
+此选项仍需要可用的剪贴板后端。
 
 ---
 
@@ -155,7 +153,7 @@ print("Hello World!")
 -i, --include PATTERN
 ```
 
-仅包含匹配 glob 模式的文件，使用逗号分隔。
+仅包含匹配 glob 模式的文件。可重复选项或用逗号分隔模式，首尾空白和空项会被忽略。
 
 当启用 `-i` 时：
 
@@ -172,7 +170,7 @@ print("Hello World!")
 -o, --omit [PATTERN]
 ```
 
-排除匹配 glob 模式的文件，使用逗号分隔。
+排除匹配 glob 模式的文件。可重复选项或用逗号分隔模式，首尾空白和空项会被忽略。
 
 行为：
 
@@ -201,6 +199,7 @@ pylistall -o -o "README.md,test_cases/*"
 
 控制是否复制二进制文件的内容。
 不会影响非二进制文件。
+包含的字节以 UTF-8 解码，无法解码的部分替换显示；不会转换或解压文档、图片和压缩包。
 
 优先级规则：
 
@@ -252,9 +251,7 @@ pylistall -i "run.exe"
 * 每一组 Git 日志前都会打印 `.git` 所在的绝对路径。
 * 多个 `.git` 中的日志会被分组打印。
 
-  当找到多个 `.git` 时：
-  * 他们会被以路径排序（大小写不敏感），以空行分隔。
-  * 如果一个 `.git` 目录和一个 `.git` 文件在同一个文件夹里，则会先打印 `.git` 目录，再打印 `.git` 文件。
+* 日志组按路径排序（大小写不敏感），以空行分隔。
 
 ---
 
@@ -319,6 +316,9 @@ pylistall -o "test/test_*"
 * Windows：`clip`
 * Linux：`xclip` 或 `pyperclip` 作为备用方案
 
+正常收集需要桌面剪贴板后端。工具不会自动排除秘密信息，也不会把符号链接限制在目标目录内。
+分享前请检查选定文件；当前边界见[架构文档](docs/architecture.zh-CN.md#安全边界与当前限制)。
+
 ---
 
 ## 环境要求
@@ -333,4 +333,5 @@ MIT License
 
 ## 参与开发
 
-环境准备与测试方法见[开发指南](docs/development.zh-CN.md)。
+环境准备、检查、构建和贡献步骤见[开发指南](docs/development.zh-CN.md)。
+产品方向见[愿景](VISION.zh-CN.md)，模块职责与数据流见[架构文档](docs/architecture.zh-CN.md)。

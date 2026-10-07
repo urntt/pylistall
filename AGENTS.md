@@ -14,31 +14,43 @@ pylistall 是一个跨平台命令行工具，用于收集指定目录下的文�
 
 ### 结构
 
+- `cli.py` 负责参数与输出组装，`tree.py` 负责真实目录树，`selection.py` 负责内容筛选和读取，`gitlog.py` 负责日志收集，`util.py` 负责剪贴板。维护这些边界，数据流与仓库结构分别见[架构文档](docs/architecture.zh-CN.md)和[开发指南](docs/development.zh-CN.md)。
+
 ### 平台
 
 - Python 支持范围以 `pyproject.toml` 的 `requires-python` 为准；标准库 API 必须兼容声明的最低版本，支持范围调整时同步更新文档和测试。
-  Python support is defined by `requires-python` in `pyproject.toml`; standard-library APIs must work on the declared minimum version, and support changes must update documentation and tests together.
+- 默认开发解释器以 `.python-version` 为准，锁文件必须支持包声明的 Python 范围。剪贴板后端变更需要覆盖平台命令及编码；模拟测试不能作为真实平台集成验证。
 
 ### 安全
 
+- 文件内容只在本地组装并复制到剪贴板，不增加网络上传或执行收集到的代码。对读取范围、敏感文件、符号链接和输出大小的实际限制，以[架构文档](docs/architecture.zh-CN.md#安全边界与当前限制)为准；不得把未来需求描述为已有保障。
+- 测试不得读取用户项目之外的私密文件、修改真实剪贴板或依赖个人凭据。改变过滤默认值或链接遍历策略时，同时审查输出影响和回归覆盖。
+
 ### 发布
+
+- 本地完成标准与发布门槛见[开发指南](docs/development.zh-CN.md#完成标准与发布门槛)。版本、发行包、标签与说明须一致；发布前验证锁定环境、最低与默认 Python、发行元数据及 wheel 安装。
+- CI 与自动发布尚未建立。版本升级、推送、打发布标签和上传发行包仅在相应任务已获用户授权时执行。
 
 ### 行为
 
+- 用户可观察行为以 [README](README.zh-CN.md) 为说明入口、`tests/` 为回归基线。目录树独立于内容过滤，`-o` 优先于 `-i` 和 `-b`；`-p` 打印后仍复制剪贴板。行为修改必须同步测试及双语文档。
+
 ### 依赖
 
+- 运行依赖、开发依赖组和检查配置统一放在 `pyproject.toml`，解析结果提交到 `uv.lock`。用户继续使用 pip；开发使用 uv。保留 setuptools 构建后端，新增运行依赖须有符合轻量 CLI 定位的理由。
+- 不再维护 `dev` extra；依赖变更按[锁文件维护](docs/development.zh-CN.md#锁文件维护)操作，不在验证时静默升级依赖。
+
 ### 开发
+
+- 先阅读适用的 agent 规则、愿景及相关权威文档，再按[开发指南](docs/development.zh-CN.md)复现环境和修改。提交前检查相关双语文档、运行 `uv run --locked python scripts/check.py`，并说明验证范围与未验证的平台或限制。
+- 按下方 Git 规则整理变更；保留用户已有改动，不把本地验证等同于已推送或已发布。
 
 ### 测试
 
 - 测试位于 `tests/`，开发环境与运行命令见 [开发指南](docs/development.zh-CN.md)。
-  Tests live in `tests/`; see the [development guide](docs/development.md) for setup and commands.
 - 测试使用临时目录并模拟剪贴板调用，避免修改真实剪贴板或依赖桌面环境。
-  Tests use temporary directories and mock clipboard calls to avoid modifying the real clipboard or requiring a desktop session.
 - 已知缺陷的 `xfail` 必须说明原因并有移除计划；修复时在同一变更中移除标记和更新文档。
-  Known-defect `xfail` markers must have a reason and removal plan; remove them and update documentation in the same change as the fix.
 - 不为新增回归添加预期失败标记来绕过测试。
-  Do not mark new regressions as expected failures to bypass tests.
 
 ## 文档
 
@@ -68,5 +80,5 @@ pylistall 是一个跨平台命令行工具，用于收集指定目录下的文�
 
 ## Agents 协作
 
-- 与用户交流、解释、进度和计划使用中文；代码、注释、docstring、分支名和提交消息使用英文，仓库文档、README 与面向用户的交付物提供中英双语。
+- 与用户交流、解释、进度和计划使用中文；AGENTS.md 使用中文；代码、注释、docstring、分支名和提交消息使用英文；仓库文档、README 与面向用户的交付物提供中英双语。
 - 不要过于依赖记忆和本地环境，要尽量保证从 Github 克隆下来的仓库可以直接以和现在一致的方式继续开发或操作。

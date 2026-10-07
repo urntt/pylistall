@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
-
 BINARY_SAMPLE_BYTES = 8192
 
 DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
@@ -258,9 +257,9 @@ def _is_included(
     """Check include patterns against filename and relative path."""
     if not include_patterns:
         return True
-    return matches_any(filename,
-                       include_patterns) or matches_any(rel_str,
-                                                        include_patterns)
+    return matches_any(filename, include_patterns) or matches_any(
+        rel_str, include_patterns
+    )
 
 
 def _is_omitted(
@@ -271,9 +270,7 @@ def _is_omitted(
     """Check omit patterns against filename and relative path."""
     if not omit_patterns:
         return False
-    return matches_any(filename,
-                       omit_patterns) or matches_any(rel_str,
-                                                     omit_patterns)
+    return matches_any(filename, omit_patterns) or matches_any(rel_str, omit_patterns)
 
 
 def _binary_allowed_by_b(
@@ -286,9 +283,9 @@ def _binary_allowed_by_b(
         return False
     if not policy.patterns:
         return True
-    return matches_any(filename,
-                       policy.patterns) or matches_any(rel_str,
-                                                       policy.patterns)
+    return matches_any(filename, policy.patterns) or matches_any(
+        rel_str, policy.patterns
+    )
 
 
 def select_files_for_content(
@@ -338,9 +335,9 @@ def build_content_sections(
     binary_policy: BinaryPolicy,
 ) -> tuple[str, int]:
     """Build file content blocks and return them with file count."""
-    selected = select_files_for_content(root=root,
-                                        selection=selection,
-                                        binary_policy=binary_policy)
+    selected = select_files_for_content(
+        root=root, selection=selection, binary_policy=binary_policy
+    )
     if not selected:
         return ("", 0)
 
