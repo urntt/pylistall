@@ -31,7 +31,8 @@ pylistall . -r -g 3 -d files
 pylistall . -r -o -D -M 100000 -f
 ```
 
-收集根路径默认是当前目录。默认展示结果，不操作剪贴板。管道或重定向输出 Markdown；
+收集根路径默认是当前目录。交互终端使用分组标题、颜色和代码高亮，不显示围栏或行号。
+默认展示结果，不操作剪贴板。管道或重定向输出 Markdown；
 状态提示和警告写入 stderr。
 
 | 选项 | 行为 |
@@ -49,6 +50,7 @@ pylistall . -r -o -D -M 100000 -f
 | `-d --disable PARTS` | 省略 `root`、`tree`、`git`、`files`，可重复或逗号分隔 |
 | `-D --dry-run` | 准确收集并报告大小、目的地，不复制、不写入 |
 | `-M --max-output-bytes N` | 正整数 Markdown UTF-8 总量预算，默认不限 |
+| `-n --no-pager` | 关闭交互终端分页 |
 | `-h --help` | 显示帮助 |
 
 至少保留一个输出部分。禁用 `files` 不采样或读取内容，禁用 `git` 不查询 Git。
@@ -100,9 +102,21 @@ pylistall . -r -o -D -M 100000 -f
 `-g` 查找 `.git` 目录与 worktree 指针文件。非递归只查根层，递归按绝对路径分组，
 日志使用 oneline 和 decorate。无仓库、空日志及 Git 失败有明确标记，需 PATH 中有 Git。
 
+### 终端分页
+
+仅 stdin 和 stdout 都是终端时分页。优先使用 `PAGER`，否则查找 `less`（包含 Git for
+Windows 自带程序），再回退系统 `more`。Less 默认 `-FRX`：短输出自动退出，空格翻页，
+`/` 搜索，`q` 退出。`-n` 或空 `PAGER` 关闭分页。配置命令拆分为程序与参数，不执行
+shell 展开。没有分页器或启动失败时直接展示。
+
+More 使用无颜色的平台编码，当前 Windows 代码页无法表示的字符可能被替换。
+Rich 或其依赖导入失败时静默回退 Markdown，重定向始终使用 Markdown，不添加 ANSI。
+终端美化不改变复制或文件的规范 Markdown。参考
+[Git 分页默认值](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager)。
+
 ## 输出格式
 
-目录包含 `README.txt` 和 `src/main.py` 时，`pylistall . -r -o` 输出：
+目录包含 `README.txt` 和 `src/main.py` 时，重定向或复制的 Markdown 为：
 
 ````markdown
 /Users/example/project

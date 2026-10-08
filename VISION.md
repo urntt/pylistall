@@ -58,8 +58,8 @@ These are future requirements, not current guarantees:
 
 1. Refine omissions and diagnostics using real collection cases; keep the limits
    of name-based sensitive-file filtering explicit.
-2. Improve interactive terminal presentation and paging while retaining canonical
-   Markdown for sharing and headless operation.
+2. Improve memory use for very large directory indexes and collections while
+   retaining exact Markdown accounting and useful terminal feedback.
 3. Refine filtering and everyday usability using real projects and regression
    evidence, with explicit migration notes for behavior changes.
 

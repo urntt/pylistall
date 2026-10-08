@@ -40,6 +40,7 @@ from pylistall.selection import (
 from pylistall.traversal import scan_directory
 from pylistall.tree import build_tree_text
 from pylistall.util import copy_to_clipboard
+from pylistall.viewer import display
 
 
 @dataclass(frozen=True)
@@ -260,6 +261,9 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Limit the complete Markdown UTF-8 byte size.",
     )
+    parser.add_argument(
+        "-n", "--no-pager", action="store_true", help="Disable interactive paging."
+    )
     return parser
 
 
@@ -284,19 +288,6 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     if args.git_log is not None and args.git_log != -1 and args.git_log <= 0:
         parser.error("--git-log count must be positive")
     return args
-
-
-def _display(result: OutputResult) -> None:
-    """Display canonical Markdown until the terminal renderer is installed."""
-    try:
-        sys.stdout.write(result.text)
-        sys.stdout.flush()
-    except BrokenPipeError:
-        # Redirecting to a closed downstream pipe is a normal CLI exit.
-        try:
-            sys.stdout.close()
-        except BrokenPipeError:
-            pass
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -355,7 +346,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             failed = True
             print(f"Error: file output failed: {exc}", file=sys.stderr)
     else:
-        _display(result)
+        display(result.document, result.text, no_pager=args.no_pager)
     if args.copy:
         try:
             copy_to_clipboard(result.text)

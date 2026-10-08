@@ -8,6 +8,10 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+- Add literal Rich terminal headings and syntax highlighting; redirection stays Markdown, missing Rich silently falls back.
+- Add `-n --no-pager`, configured PAGER / less / Git bundled less / more selection, Unicode transport and graceful quit/closed-pipe handling.
+- Promote the already locked Rich 15.0.0 to a runtime dependency without upgrading other packages.
+
 - Change default copying to display; add `-c`, `-f`, `-w`, `-d`, `-D`, `-M`; remove `-p`.
 - Collect one structured result; generate typed, escaped Markdown with dynamic fences.
 - Stream file/Git reads with exact Markdown budgets, dry-run summaries and no partial delivery.

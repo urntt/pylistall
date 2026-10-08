@@ -238,6 +238,7 @@ def test_broken_pipe_is_normal(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "short,long,value",
     [
+        ("-n", "--no-pager", None),
         ("-r", "--recursive", None),
         ("-l", "--follow-links", None),
         ("-i", "--include", "*.py"),

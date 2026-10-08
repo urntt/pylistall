@@ -17,6 +17,7 @@ future requirements in the [vision](../VISION.md), and contributor commands in
 | `gitlog.py` | Find repositories in the shared entries and collect Git logs |
 | `output.py` | Structured model, Markdown and total budget |
 | `destinations.py` | File paths and transactional writes |
+| `viewer.py` | Literal Rich terminal rendering and pager transport |
 | `util.py` | Platform clipboard transport |
 
 ```text
@@ -94,7 +95,13 @@ only begins after the whole budget passes. Total size is unlimited by default.
 Disabled files avoid sampling/reading; disabled Git avoids subprocesses. Dry-run
 collects exactly and reports size, skips and destinations on stderr without writes.
 
-Default display is Markdown; `-c` additionally copies and `-f` suppresses the body.
+Default display uses Rich on a TTY and Markdown on redirection; `-c` additionally
+copies Markdown and `-f` suppresses the body. `viewer.py` consumes the same model
+and language tags, lazily imports Rich and silently falls back on ImportError.
+Text/Syntax render literal data, with no line numbers or Markdown fences.
+Paging requires both streams to be terminals and honors `-n` and `PAGER`.
+Less defaults to `-FRX` and UTF-8; system more uses plain platform-encoded text.
+Pager startup failures display directly; normal quits and closed pipes are harmless.
 `destinations.py` calculates one local timestamp per invocation, resolves relative
 paths from invocation cwd and excludes the target and symbolic/hard-link aliases.
 New files use exclusive creation and cleanup on failure; overwrites complete a

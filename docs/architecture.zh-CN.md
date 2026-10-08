@@ -16,6 +16,7 @@
 | `gitlog.py` | 从共享条目查找仓库并收集 Git 日志 |
 | `output.py` | 结构化模型、Markdown 与总量预算 |
 | `destinations.py` | 文件路径与安全写入 |
+| `viewer.py` | Rich 字面量展示及分页传输 |
 | `util.py` | 平台剪贴板传输 |
 
 ```text
@@ -81,7 +82,12 @@
 `-d files` 避免采样和读取，`-d git` 避免调用 Git；`-D` 准确收集后只向 stderr
 报告大小、跳过数与目的地，不创建目录、写文件或复制。
 
-默认展示 Markdown；`-c` 额外复制，`-f` 不展示正文。`destinations.py` 每次命令计算
+默认在 TTY 使用 Rich，重定向使用 Markdown；`-c` 额外复制 Markdown，`-f` 不展示正文。
+`viewer.py` 使用同一模型与语言标签，延迟导入 Rich，ImportError 静默回退。Text/Syntax
+按字面量展示，不增加行号或围栏。分页要求两个流都是终端，遵循 `-n` 与 `PAGER`；
+Less 使用 `-FRX` 和 UTF-8，系统 more 使用无颜色的平台编码。启动失败直接展示，
+正常退出及下游关闭管道不会产生 traceback。
+`destinations.py` 每次命令计算
 一次本地时间名称，从命令执行目录解析相对路径，收集前排除目标及符号／硬链接别名。
 非覆盖使用独占创建并清理失败文件；覆盖先写同目录临时文件再替换，保留原文件。
 UTF-8、无 BOM、LF。收集和预算成功后才创建父目录，已有目录不能覆盖为文件。
