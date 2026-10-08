@@ -6,24 +6,66 @@ Changes are grouped by the version prepared for release. Publication status and
 dates are recorded in [GitHub Releases](https://github.com/urntt/pylistall/releases).
 Maintainers follow the [release guide](docs/releasing.md).
 
-## [Unreleased]
+## [1.0.0]
 
-- Add literal Rich terminal headings and syntax highlighting; redirection stays Markdown, missing Rich silently falls back.
-- Add `-n --no-pager`, configured PAGER / less / Git bundled less / more selection, Unicode transport and graceful quit/closed-pipe handling.
-- Promote the already locked Rich 15.0.0 to a runtime dependency without upgrading other packages.
+### Added
 
-- Change default copying to display; add `-c`, `-f`, `-w`, `-d`, `-D`, `-M`; remove `-p`.
-- Collect one structured result; generate typed, escaped Markdown with dynamic fences.
-- Stream file/Git reads with exact Markdown budgets, dry-run summaries and no partial delivery.
-- Save UTF-8/LF files from invocation cwd, exclude the destination and aliases, reject collisions and preserve originals on failed overwrites.
+- Add `-c --copy` for explicit clipboard copying and `-f --file [DEST]` for
+  UTF-8/LF file export. Resolve relative destinations from the invocation
+  directory, generate local-time filenames, and exclude the output and its aliases
+  from content collection. Reject existing files unless `-w --overwrite` is set;
+  failed overwrites preserve the original.
+- Add `-d --disable` to omit root, tree, Git, or files across every destination.
+  Disabled file contents and Git logs are not read.
+- Add `-D --dry-run` summaries and exact Markdown byte limits with
+  `-M --max-output-bytes`. Stream file and Git reads, stop on overflow, and deliver
+  no partial result.
+- Add Rich terminal headings and syntax highlighting, with literal paths and
+  content. Missing Rich silently falls back to Markdown.
+- Add `-n --no-pager` and interactive pagination through `PAGER`, less, Git bundled
+  less on Windows, or more. Handle Unicode, normal pager exit, and closed pipes.
+- Promote the already locked Rich 15.0.0 to a runtime dependency without upgrading
+  other packages.
 
 ### Changed
 
+- Display results by default instead of copying them. Interactive terminals use
+  the styled viewer; redirection, file export, and copying use Markdown.
+- Generate grouped Markdown from one structured result, with language identifiers,
+  escaped paths, and fences longer than any backtick sequence in the content.
 - Share iterative discovery across the tree, file selection, and Git lookup.
 - Show links without reading them by default; `-l / --follow-links` opts into
   targets inside or outside the root, with ancestor cycle detection.
 - Expand opt-in default omissions for nested Git metadata, caches, generated
   output, and common credential filenames. Omitted names remain in the tree.
+
+### Removed
+
+- Remove `-p --print`; displaying results is now the default.
+
+### Migration from 0.3.1
+
+- Add `-c` to commands that should continue copying. Omit the old `-p` to display
+  results, or replace it with `-c` to display and copy:
+
+  ```bash
+  # 0.3.1: display and copy
+  pylistall . -r -o -p
+  # 1.0.0: display and copy
+  pylistall . -r -o -c
+  ```
+
+- Use `-f` to save the complete Markdown instead of displaying the terminal body;
+  combine it with `-c` to save and copy. Use `-d files` to suppress file headings
+  and contents while retaining the other enabled sections. `-h` remains help.
+- Update consumers of Markdown to account for section headings, escaped paths,
+  language identifiers, and dynamic fences.
+- Links are now shown with `@` and skipped by default. Add `-l` to read linked
+  targets, including targets outside the root; linked directories also require
+  `-r` to expand.
+- Review the expanded bare `-o` defaults if collecting examples or public
+  certificates. Custom `-o PATTERN` still replaces the default omissions. The
+  defaults cannot detect arbitrary secrets and do not load `.gitignore`.
 
 ## [0.3.1]
 
