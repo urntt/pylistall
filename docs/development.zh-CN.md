@@ -14,9 +14,10 @@ pylistall/
 ├── README*.md                 用户指南
 ├── VISION*.md                 产品方向
 ├── docs/                      双语开发与架构文档
+├── .github/                   CI 工作流与双语 pull request 模板
 ├── src/pylistall/              CLI、目录树、筛选、Git 日志、剪贴板
 ├── tests/                     行为与回归测试
-├── scripts/check.py           检查组织入口
+├── scripts/                   统一检查、CI 矩阵与 wheel 冒烟验证
 ├── pyproject.toml             元数据、依赖、构建与检查配置
 ├── uv.lock                    解析后的运行与开发依赖
 └── .python-version            默认开发解释器
@@ -102,6 +103,7 @@ UTF-8 边界、读取上限、目录树、CLI 输出与错误、Git 分组和剪
 ```sh
 uv build
 uv run --locked python -m twine check dist/*
+uv run --locked python scripts/smoke_wheel.py
 ```
 
 `uv build` 在 `dist/` 中生成 wheel 和源码包，默认从源码包构建 wheel。
@@ -109,28 +111,26 @@ uv run --locked python -m twine check dist/*
 并只检查其中的包，避免混入旧版本。版本来自 `pyproject.toml`，验证无需升级版本。
 隔离构建依赖遵循 `[build-system].requires`，与项目依赖锁分开。
 
-在独立环境中安装生成的 wheel；将下面的 `0.3.0` 替换为正在验证的版本：
+[wheel 冒烟验证](../scripts/smoke_wheel.py) 要求目录中恰有一个 wheel 和一个源码包。
+它在 `.pytest_cache` 内建立临时环境，安装 wheel，确认导入来自该环境，
+将发行元数据与开发环境安装结果比较，并运行已安装 CLI 的帮助；结束后删除临时环境。
+单独构建目录可作为参数传入：
+`uv run --locked python scripts/smoke_wheel.py dist/verify-1`。
 
-```sh
-uv venv .pytest_cache/wheel-smoke
-uv pip install --python .pytest_cache/wheel-smoke dist/pylistall-0.3.0-py3-none-any.whl
-```
+完整仓库验收需要在独立的新克隆目录、没有现有 `.venv` 的情况下，
+重复环境同步、帮助、统一检查、构建、元数据检查和 wheel 安装。
+在可丢弃的克隆目录中也检查最低 Python 的兼容性。
 
-PowerShell：
+### 元数据与徽章
 
-```powershell
-.\.pytest_cache\wheel-smoke\Scripts\pylistall.exe --help
-```
+项目使用 SPDX 许可证表达式并明确包含 `LICENSE`；setuptools 的最低版本
+支持在 Python 3.9 上生成该元数据格式。运行依赖和 Python 支持范围仍在
+`pyproject.toml` 中定义，开发依赖组不会成为 wheel 的 extra。
 
-macOS 或 Linux：
-
-```sh
-.pytest_cache/wheel-smoke/bin/pylistall --help
-```
-
-这验证了没有可编辑项目安装时的入口。完整仓库验收需要在独立的新克隆目录、
-没有现有 `.venv` 的情况下，重复环境同步、帮助、统一检查、构建、元数据检查和
-wheel 安装。在可丢弃的克隆目录中也检查最低 Python 的兼容性。
+Python classifiers 列出 CI 覆盖的边界版本，当前为 3.9 和 3.14，
+不能替代 `requires-python`。Shields 的 PyPI Python 版本徽章读取已发布包的
+classifiers，不读取 `Requires-Python` 或当前仓库。元数据修改需要发布新版本并
+等待缓存刷新后才会反映到徽章；发布时验证其显示结果，再恢复到 README。
 
 ## 锁文件维护
 
@@ -158,6 +158,28 @@ uv run --locked python scripts/check.py
    配置留在权威文件内，其他位置用链接引用。
 4. 审查 `git diff`，运行统一检查，说明测试解释器、平台范围和限制，
    使用英文 Conventional Commits 提交。
+5. 推送已获授权的分支，使用[模板](../.github/pull_request_template.md)创建 pull request。
+   审查完整差异，最新版本的 `CI` 检查通过后才能合并。开发者与 agent 使用同样的检查，
+   本地通过不能替代 GitHub 上的结果。
+
+## 持续集成
+
+[CI 工作流](../.github/workflows/ci.yml) 在推送、pull request 和手动触发时运行。
+Actions 固定到提交 SHA，uv 固定到已验证的工具版本；任务从新检出的仓库开始，
+使用 `uv sync --locked` 同步环境。
+
+[矩阵脚本](../scripts/ci_matrix.py) 从已安装的项目元数据读取最低 Python，
+从 `.python-version` 读取默认解释器。两个版本分别在 Windows、Linux 和 macOS
+运行 CLI 帮助及统一检查。Python 支持约束的形式改变时，同步修改解析脚本。
+测试通过模拟验证平台命令，不等于验证真实桌面剪贴板。
+
+六项检查全部通过后，两个 Python 版本的 Linux 打包任务分别构建 wheel 和源码包，
+运行 Twine 及隔离 wheel 冒烟验证，并将发行包保留七天，不上传到 PyPI。
+最终 `CI` 任务在任一必要任务失败、取消或跳过时失败，为分支保护提供稳定的检查名称。
+
+`main` 要求通过 pull request 合并，且分支相对 `main` 为最新、`CI` 通过，
+管理员也遵守这些要求。单维护者仓库不要求额外审查者批准。
+只审查和合并已验证的版本；分支有新修改或更新了 `main` 后，等待新的 CI 结果。
 
 ## 完成标准与发布门槛
 
@@ -167,5 +189,5 @@ Python 兼容性修改必须通过最低与默认版本。打包修改还须通�
 明确实际验证范围，不把剪贴板模拟测试描述成真实平台验证。
 
 发布前要求上述检查通过，并有明确版本决策、匹配的发行元数据以及一致的发行说明和标签。
-审查要发布的具体文件，确保不混入旧包。CI 和自动发布属于后续工作，
-当前本地检查不代表已经建立。版本升级、远程推送、发布标签和上传是单独授权的任务。
+审查要发布的具体文件，确保不混入旧包；最新版本还必须通过 CI。
+自动发布仍属后续工作。版本升级、远程推送、发布标签和上传是单独授权的任务。

@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  configure:
+    name: Read project configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      checks: ${{ steps.matrix.outputs.checks }}
+      python: ${{ steps.matrix.outputs.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.23"
+          enable-cache: true
+      - run: uv sync --locked
+      - id: matrix
+        run: uv run --locked python scripts/ci_matrix.py >> "$GITHUB_OUTPUT"
+
+  checks:
+    name: Checks (${{ matrix.os }}, Python ${{ matrix.python }})
+    needs: configure
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.configure.outputs.checks) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.23"
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --locked pylistall --help
+      - run: uv run --locked python scripts/check.py
+
+  package:
+    name: Package (Python ${{ matrix.python }})
+    needs: [configure, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ${{ fromJSON(needs.configure.outputs.python) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.23"
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv build
+      - run: uv run --locked python -m twine check dist/*
+      - run: uv run --locked python scripts/smoke_wheel.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: distributions-python-${{ matrix.python }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  ci:
+    name: CI
+    if: ${{ always() }}
+    needs: [configure, checks, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CONFIGURE_RESULT: ${{ needs.configure.result }}
+      CHECKS_RESULT: ${{ needs.checks.result }}
+      PACKAGE_RESULT: ${{ needs.package.result }}
+    steps:
+      - name: Require every job to succeed
+        run: |
+          test "$CONFIGURE_RESULT" = success
+          test "$CHECKS_RESULT" = success
+          test "$PACKAGE_RESULT" = success

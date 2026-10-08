@@ -39,16 +39,17 @@ binary inclusion, and a per-file read limit. Content filters do not hide tree
 entries. The [architecture document](docs/architecture.md) describes the actual
 matching, encoding, failure behavior, and current safety limitations.
 
-The repository provides behavior tests, uv dependency locking, Ruff checks, and
-bilingual contributor guidance. These foundations enable developers and agents to
+The repository provides behavior tests, uv dependency locking, Ruff checks, CI for
+the minimum and default Python versions on three platforms, and bilingual
+contributor guidance. These foundations enable developers and agents to
 continue work from a fresh checkout without relying on a previous conversation.
 
 ## Next priorities
 
 These are future requirements, not current guarantees:
 
-1. Establish CI for the supported Python range and platform behavior, then build
-   a reviewed release workflow with artifact verification and automated publishing.
+1. Build a reviewed release workflow on top of CI, with artifact verification and
+   automated publishing.
 2. Define and implement safer collection boundaries: sensitive-file exclusions,
    a consistent symlink policy with cycle detection, and clearer error reporting.
    Decide how filename visibility in the tree should interact with these controls.

@@ -15,9 +15,10 @@ pylistall/
 ├── README*.md                 user guides
 ├── VISION*.md                 product direction
 ├── docs/                      development and architecture, in both languages
+├── .github/                   CI workflow and bilingual pull request template
 ├── src/pylistall/              CLI, tree, selection, Git logs, clipboard
 ├── tests/                     behavior and regression tests
-├── scripts/check.py           check orchestration
+├── scripts/                   unified checks, CI matrix and wheel smoke test
 ├── pyproject.toml             metadata, dependencies, build and check configuration
 ├── uv.lock                    resolved runtime and development dependencies
 └── .python-version            default development interpreter
@@ -112,6 +113,7 @@ The build backend remains setuptools. From the repository root:
 ```sh
 uv build
 uv run --locked python -m twine check dist/*
+uv run --locked python scripts/smoke_wheel.py
 ```
 
 `uv build` creates both a wheel and a source distribution in `dist/`, building the
@@ -121,30 +123,29 @@ to avoid mixing old releases. The version comes from `pyproject.toml`; validatio
 does not require a version bump. Isolated build dependencies follow
 `[build-system].requires`; they are separate from the project dependency lock.
 
-Install the resulting wheel in a separate environment, replacing `0.3.0` below
-with the version being verified:
+The [wheel smoke test](../scripts/smoke_wheel.py) expects exactly one wheel and one
+source distribution. It creates a temporary environment inside `.pytest_cache`,
+installs the wheel, verifies that imports come from that environment, compares its
+metadata with the development installation, and runs the installed CLI's help.
+The environment is removed afterward. For a separate build directory, pass it as
+an argument: `uv run --locked python scripts/smoke_wheel.py dist/verify-1`.
 
-```sh
-uv venv .pytest_cache/wheel-smoke
-uv pip install --python .pytest_cache/wheel-smoke dist/pylistall-0.3.0-py3-none-any.whl
-```
-
-On PowerShell:
-
-```powershell
-.\.pytest_cache\wheel-smoke\Scripts\pylistall.exe --help
-```
-
-On macOS or Linux:
-
-```sh
-.pytest_cache/wheel-smoke/bin/pylistall --help
-```
-
-This verifies the installed entry point without an editable project installation.
 For a full repository check, repeat setup, help, unified checks, build, metadata
 checks, and wheel installation in a separate fresh clone with no existing `.venv`.
 Use a disposable clone to check minimum-Python compatibility too.
+
+### Metadata and badges
+
+The project uses an SPDX license expression and explicitly includes `LICENSE`;
+the setuptools lower bound supports this metadata format on Python 3.9. Runtime
+dependencies and Python support remain in `pyproject.toml`; development dependency
+groups are not wheel extras.
+
+Python classifiers list the boundary versions covered by CI, currently 3.9 and
+3.14. They do not replace `requires-python`. Shields' PyPI Python-version badge
+reads the classifiers of the published package, not `Requires-Python` or this
+checkout. A metadata change appears there only after a release and cache refresh;
+verify the badge when publishing before restoring it to the README.
 
 ## Lock maintenance
 
@@ -174,6 +175,34 @@ to bypass an inconsistent project configuration.
    authoritative file and link to it elsewhere.
 4. Review `git diff`, run the unified checks, and report tested interpreters,
    platform scope, and limitations. Commit using English Conventional Commits.
+5. Push the authorized branch and open a pull request using the
+   [template](../.github/pull_request_template.md). Review the full diff and require
+   the latest revision's `CI` check to pass before merging. Humans and agents use
+   the same checks; local success does not replace the GitHub result.
+
+## Continuous integration
+
+[The CI workflow](../.github/workflows/ci.yml) runs on pushes, pull requests, and
+manual dispatches. Actions are pinned to commit SHAs and uv is pinned to the
+validated tool version. Jobs start from fresh checkouts and use `uv sync --locked`.
+
+[The matrix helper](../scripts/ci_matrix.py) reads the minimum Python from installed
+project metadata and the default interpreter from `.python-version`. Each runs
+CLI help and the unified checks on Windows, Linux, and macOS. If the Python support
+constraint changes shape, update the parser as part of that change. Passing these
+tests validates platform commands through mocks; it does not test a real desktop
+clipboard.
+
+After all six checks pass, Linux packaging jobs for both Python versions build a
+wheel and source distribution, run Twine and the isolated wheel smoke test, and
+retain the artifacts for seven days. They do not publish them. The final `CI` job
+fails if any required job fails, is cancelled, or is skipped, giving branch
+protection one stable check name.
+
+The `main` branch requires a pull request and the `CI` check, including for admins,
+with the branch current against `main`. No additional approving reviewer is required
+for this single-maintainer repository. Review and merge only the tested revision;
+if the branch changes or is updated against `main`, wait for its new CI run.
 
 ## Completion and release gates
 
@@ -186,6 +215,6 @@ do not describe mocked clipboard tests as real platform validation.
 
 Before a release, require these checks, an intentional version decision, matching
 artifact metadata, and consistent release notes and tag. Review the exact artifacts
-to publish and ensure old files are not included. CI and automated publishing are
-future work; the current local checks do not establish them. Version bumps, remote
-pushes, release tags, and uploads are separate, explicitly authorized tasks.
+to publish and ensure old files are not included. The latest revision must pass CI;
+automated publishing is still future work. Version bumps, remote pushes, release
+tags, and uploads are separate, explicitly authorized tasks.
