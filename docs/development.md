@@ -13,6 +13,7 @@ in the [README](../README.md).
 pylistall/
 ├── AGENTS.md / CLAUDE.md       agent rules / import of those rules
 ├── README*.md                 user guides
+├── CHANGELOG*.md              bilingual version changes
 ├── VISION*.md                 product direction
 ├── docs/                      development and architecture, in both languages
 ├── .github/                   CI workflow and bilingual pull request template
@@ -20,6 +21,7 @@ pylistall/
 ├── tests/                     behavior and regression tests
 ├── scripts/                   unified checks, CI matrix and wheel smoke test
 ├── pyproject.toml             metadata, dependencies, build and check configuration
+├── MANIFEST.in                contributor resources included in the source package
 ├── uv.lock                    resolved runtime and development dependencies
 └── .python-version            default development interpreter
 ```
@@ -94,11 +96,13 @@ uv sync --locked
 ```
 
 This temporarily changes the project's `.venv` interpreter. Tests currently cover
-74 cases for selection, binary precedence, UTF-8 boundaries, read limits, directory
+the CLI behavior baseline for selection, binary precedence, UTF-8 boundaries, read limits, directory
 trees, CLI output and errors, Git grouping, and clipboard backend selection. They
 use temporary directories and mock clipboard programs, pyperclip, and Git log
 retrieval. They do not modify the real clipboard or require a desktop session.
 Backend mocks verify commands and encodings, not actual OS integration.
+Release tests also cover rejection of mixed artifacts, inconsistent metadata,
+missing notes, invalid tags, and changed remote hashes without network uploads.
 
 The baseline fixes include normalized include patterns, default omissions at the
 root and nested levels, incremental UTF-8 sampling, and Python 3.9-compatible
@@ -122,6 +126,8 @@ verification run (`uv build --out-dir dist/verify-1`) and check only its artifac
 to avoid mixing old releases. The version comes from `pyproject.toml`; validation
 does not require a version bump. Isolated build dependencies follow
 `[build-system].requires`; they are separate from the project dependency lock.
+`MANIFEST.in` includes the contributor docs, lock, scripts, and workflow definitions
+in source distributions, so the included release tests retain their dependencies.
 
 The [wheel smoke test](../scripts/smoke_wheel.py) expects exactly one wheel and one
 source distribution. It creates a temporary environment inside `.pytest_cache`,
@@ -216,5 +222,6 @@ do not describe mocked clipboard tests as real platform validation.
 Before a release, require these checks, an intentional version decision, matching
 artifact metadata, and consistent release notes and tag. Review the exact artifacts
 to publish and ensure old files are not included. The latest revision must pass CI;
-automated publishing is still future work. Version bumps, remote pushes, release
-tags, and uploads are separate, explicitly authorized tasks.
+the [release guide](releasing.md) defines service setup, tag preparation, TestPyPI
+verification, production approval, and failure handling. Version bumps, remote
+pushes, release tags, and uploads are separate, explicitly authorized tasks.

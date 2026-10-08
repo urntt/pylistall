@@ -335,3 +335,8 @@ MIT License
 
 环境准备、检查、构建和贡献步骤见[开发指南](docs/development.zh-CN.md)。
 产品方向见[愿景](VISION.zh-CN.md)，模块职责与数据流见[架构文档](docs/architecture.zh-CN.md)。
+
+## 版本发布
+
+版本变更见[更新记录](CHANGELOG.zh-CN.md)，已发布版本见
+[GitHub Releases](https://github.com/urntt/pylistall/releases)。维护者使用[发布指南](docs/releasing.zh-CN.md)。

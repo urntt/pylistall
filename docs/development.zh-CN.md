@@ -12,6 +12,7 @@
 pylistall/
 ├── AGENTS.md / CLAUDE.md       agent 规则 / 导入这些规则
 ├── README*.md                 用户指南
+├── CHANGELOG*.md              双语版本变更
 ├── VISION*.md                 产品方向
 ├── docs/                      双语开发与架构文档
 ├── .github/                   CI 工作流与双语 pull request 模板
@@ -19,6 +20,7 @@ pylistall/
 ├── tests/                     行为与回归测试
 ├── scripts/                   统一检查、CI 矩阵与 wheel 冒烟验证
 ├── pyproject.toml             元数据、依赖、构建与检查配置
+├── MANIFEST.in                源码包包含的贡献资源
 ├── uv.lock                    解析后的运行与开发依赖
 └── .python-version            默认开发解释器
 ```
@@ -86,10 +88,12 @@ uv run --locked --python 3.9 python scripts/check.py
 uv sync --locked
 ```
 
-这会临时改变项目 `.venv` 的解释器。当前 74 项测试覆盖筛选、二进制优先级、
+这会临时改变项目 `.venv` 的解释器。CLI 行为基线测试覆盖筛选、二进制优先级、
 UTF-8 边界、读取上限、目录树、CLI 输出与错误、Git 分组和剪贴板后端选择。
 测试使用临时目录，模拟剪贴板程序、pyperclip 和 Git 日志获取，
 不会修改真实剪贴板，也不依赖桌面会话。后端模拟验证命令及编码，不等于真实 OS 集成。
+发布测试还覆盖混杂发行包、元数据不一致、缺失说明、错误标签及远端哈希改变时的拒绝行为，
+不依赖网络上传。
 
 基线修复包括统一包含模式规范化、根层级及嵌套层级的默认排除、
 增量 UTF-8 采样和兼容 Python 3.9 的 dataclass。
@@ -110,6 +114,8 @@ uv run --locked python scripts/smoke_wheel.py
 验证时使用新的输出目录，例如 `uv build --out-dir dist/verify-1`，
 并只检查其中的包，避免混入旧版本。版本来自 `pyproject.toml`，验证无需升级版本。
 隔离构建依赖遵循 `[build-system].requires`，与项目依赖锁分开。
+`MANIFEST.in` 将贡献文档、锁文件、脚本与工作流定义包含进源码包，
+使其中的发布测试保留所需文件。
 
 [wheel 冒烟验证](../scripts/smoke_wheel.py) 要求目录中恰有一个 wheel 和一个源码包。
 它在 `.pytest_cache` 内建立临时环境，安装 wheel，确认导入来自该环境，
@@ -190,4 +196,5 @@ Python 兼容性修改必须通过最低与默认版本。打包修改还须通�
 
 发布前要求上述检查通过，并有明确版本决策、匹配的发行元数据以及一致的发行说明和标签。
 审查要发布的具体文件，确保不混入旧包；最新版本还必须通过 CI。
-自动发布仍属后续工作。版本升级、远程推送、发布标签和上传是单独授权的任务。
+[发布指南](releasing.zh-CN.md) 规定服务配置、标签准备、TestPyPI 验证、正式批准与失败处理。
+版本升级、远程推送、发布标签和上传是单独授权的任务。

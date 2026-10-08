@@ -344,3 +344,9 @@ MIT License
 See the [development guide](docs/development.md) for setup, checks, builds, and
 contribution steps. Product direction is in the [vision](VISION.md); module
 responsibilities and data flow are in [architecture](docs/architecture.md).
+
+## Releases
+
+See the [changelog](CHANGELOG.md) for version changes and
+[GitHub Releases](https://github.com/urntt/pylistall/releases) for published versions.
+Maintainers use the [release guide](docs/releasing.md).
