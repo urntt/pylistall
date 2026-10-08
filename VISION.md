@@ -39,6 +39,11 @@ binary inclusion, and a per-file read limit. Content filters do not hide tree
 entries. The [architecture document](docs/architecture.md) describes the actual
 matching, encoding, failure behavior, and current safety limitations.
 
+Tree, content, and Git discovery share an iterative scan. Links are displayed
+without being followed by default; explicit following permits external targets
+and detects ancestor cycles. Bare `-o` adds common sensitive filenames to its
+omissions, while retaining names in the tree; this is not automatic secret detection.
+
 The repository provides behavior tests, uv dependency locking, Ruff checks, CI for
 the minimum and default Python versions on three platforms, and bilingual
 contributor guidance. These foundations enable developers and agents to
@@ -51,9 +56,8 @@ configuration and future releases follow the [release guide](docs/releasing.md).
 
 These are future requirements, not current guarantees:
 
-1. Define and implement safer collection boundaries: sensitive-file exclusions,
-   a consistent symlink policy with cycle detection, and clearer error reporting.
-   Decide how filename visibility in the tree should interact with these controls.
+1. Refine omissions and diagnostics using real collection cases; keep the limits
+   of name-based sensitive-file filtering explicit.
 2. Control total output volume and provide a useful preview, beyond the current
    per-file limit. Design a stdout-only mode for environments without a clipboard.
 3. Refine filtering and everyday usability using real projects and regression

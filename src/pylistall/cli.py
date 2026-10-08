@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
@@ -16,6 +17,7 @@ from pylistall.selection import (
     parse_binary_policy,
     parse_omit_patterns,
 )
+from pylistall.traversal import scan_directory
 from pylistall.tree import build_tree_text
 from pylistall.util import copy_to_clipboard
 
@@ -37,17 +39,20 @@ def _build_output(
 ) -> OutputResult:
     """Build the final output text and return it along with file count."""
     chunks: list[str] = []
+    snapshot = scan_directory(root, selection.recursive, selection.follow_links)
 
     # 1) Root + tree (tree is independent from all filters except -r)
     #    Uses 10 backticks as fence
     chunks.append(f"{root.resolve()}\n")
-    tree_text = build_tree_text(root=root, recursive=selection.recursive)
+    tree_text = build_tree_text(
+        root=root, recursive=selection.recursive, snapshot=snapshot
+    )
     if tree_text:
         chunks.append(f"``````````\n{tree_text}\n``````````\n\n")
     else:
         chunks.append("(empty)\n\n")
 
-    warnings: list[str] = []
+    warnings: list[str] = list(snapshot.warnings)
 
     # 2) Git logs (always print absolute .git path before each group)
     if git_options.enabled:
@@ -55,6 +60,7 @@ def _build_output(
             root=root,
             recursive=selection.recursive,
             count=git_options.count,
+            snapshot=snapshot,
         )
         warnings.extend(git_warnings)
         if sections:
@@ -68,6 +74,7 @@ def _build_output(
         root=root,
         selection=selection,
         binary_policy=binary_policy,
+        snapshot=snapshot,
     )
     if content_text:
         chunks.append(content_text)
@@ -100,6 +107,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--recursive",
         action="store_true",
         help="Recurse into subdirectories (tree will include directories).",
+    )
+
+    parser.add_argument(
+        "-l",
+        "--follow-links",
+        action="store_true",
+        help="Follow file and directory links, including targets outside the root.",
     )
 
     parser.add_argument(
@@ -198,17 +212,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         include=flatten_patterns(args.include),
         omit=omit_patterns,
         max_bytes=args.max_bytes,
+        follow_links=args.follow_links,
     )
     binary_policy = parse_binary_policy(args.binary)
 
     git_options = GitLogOptions(enabled=args.git_log is not None, count=args.git_log)
 
-    result = _build_output(
-        root=root,
-        selection=selection,
-        binary_policy=binary_policy,
-        git_options=git_options,
-    )
+    try:
+        result = _build_output(
+            root=root,
+            selection=selection,
+            binary_policy=binary_policy,
+            git_options=git_options,
+        )
+    except (OSError, RuntimeError) as exc:
+        print(f"Error: failed to collect {root}: {exc}", file=sys.stderr)
+        return 1
 
     if args.print_output:
         # Print full content first, then an empty line, then the copy message.

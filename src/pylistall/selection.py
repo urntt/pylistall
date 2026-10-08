@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import codecs
 import fnmatch
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
+
+from pylistall.traversal import TraversalResult, scan_directory
 
 BINARY_SAMPLE_BYTES = 8192
 
 DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
     # Git
-    ".git/**",
+    "**/.git",
+    "**/.git/**",
     # Python caches / tooling
     "**/__pycache__/**",
     "**/.pytest_cache/**",
@@ -35,6 +39,51 @@ DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
     "**/.gitignore",
     "**/.DS_Store",
     "**/Thumbs.db",
+    # Additional tooling and name-based sensitive omissions.
+    "**/.nox/**",
+    "**/.hypothesis/**",
+    "**/.ipynb_checkpoints/**",
+    "**/__pypackages__/**",
+    "**/.eggs/**",
+    "**/htmlcov/**",
+    "**/.coverage",
+    "**/.coverage.*",
+    "**/.next/**",
+    "**/.nuxt/**",
+    "**/.output/**",
+    "**/.svelte-kit/**",
+    "**/.turbo/**",
+    "**/.parcel-cache/**",
+    "**/.vite/**",
+    "**/coverage/**",
+    "**/.nyc_output/**",
+    "**/*.tsbuildinfo",
+    "**/.eslintcache",
+    "**/.stylelintcache",
+    "**/.cache/**",
+    "**/target/**",
+    "**/.gradle/**",
+    "**/.vs/**",
+    "**/*.swp",
+    "**/*.swo",
+    "**/*~",
+    "**/desktop.ini",
+    "**/pylistall-output-*.md",
+    "**/.env",
+    "**/.env.*",
+    "**/.envrc",
+    "**/.pypirc",
+    "**/.netrc",
+    "**/id_rsa",
+    "**/id_dsa",
+    "**/id_ecdsa",
+    "**/id_ed25519",
+    "**/*.key",
+    "**/*.pem",
+    "**/*.p12",
+    "**/*.pfx",
+    "**/.aws/credentials",
+    "**/.streamlit/secrets.toml",
 )
 
 BINARY_EXTENSIONS: frozenset[str] = frozenset(
@@ -89,6 +138,7 @@ class SelectionOptions:
     include: tuple[str, ...]
     omit: tuple[str, ...]
     max_bytes: Optional[int]
+    follow_links: bool = False
 
 
 @dataclass(frozen=True)
@@ -161,11 +211,6 @@ def matches_any(target: str, patterns: Iterable[str]) -> bool:
     return any(fnmatch.fnmatch(target, pattern) for pattern in patterns)
 
 
-def _rel_string(root: Path, path: Path) -> str:
-    """Get a stable, posix-style relative string for matching and display."""
-    return path.relative_to(root).as_posix()
-
-
 def is_probably_binary(path: Path) -> bool:
     """Heuristically determine whether a file is binary.
 
@@ -236,19 +281,6 @@ def read_text(path: Path, max_bytes: Optional[int]) -> str:
     return text
 
 
-def iter_files(root: Path, recursive: bool) -> Iterable[Path]:
-    """Iterate files under root (non-recursive by default)."""
-    if recursive:
-        for item in root.rglob("*"):
-            if item.is_file():
-                yield item
-        return
-
-    for item in root.iterdir():
-        if item.is_file():
-            yield item
-
-
 def _is_included(
     filename: str,
     rel_str: str,
@@ -292,19 +324,34 @@ def select_files_for_content(
     root: Path,
     selection: SelectionOptions,
     binary_policy: BinaryPolicy,
+    *,
+    snapshot: Optional[TraversalResult] = None,
 ) -> list[SelectedFile]:
     """Select files for content output based on -i/-o/-b and binary rules."""
     selected: list[SelectedFile] = []
 
-    for file_path in iter_files(root, selection.recursive):
-        rel_str = _rel_string(root, file_path)
-        filename = file_path.name
+    if snapshot is None:
+        snapshot = scan_directory(root, selection.recursive, selection.follow_links)
+    root = snapshot.root
+    for entry in snapshot.entries:
+        if not entry.is_file or entry.skipped is not None:
+            continue
+        file_path = entry.resolved_path
+        assert file_path is not None
+        rel_str = entry.relative_path.as_posix()
+        filename = entry.path.name
 
         included = _is_included(filename, rel_str, selection.include)
         if not included:
             continue
 
         if _is_omitted(filename, rel_str, selection.omit):
+            continue
+        try:
+            target_relative = Path(os.path.relpath(file_path, root)).as_posix()
+        except ValueError:
+            target_relative = file_path.as_posix()
+        if _is_omitted(file_path.name, target_relative, selection.omit):
             continue
 
         is_binary = is_probably_binary(file_path)
@@ -320,7 +367,7 @@ def select_files_for_content(
         selected.append(
             SelectedFile(
                 absolute_path=file_path,
-                relative_path=file_path.relative_to(root),
+                relative_path=entry.relative_path,
                 display_name=display,
             )
         )
@@ -333,10 +380,12 @@ def build_content_sections(
     root: Path,
     selection: SelectionOptions,
     binary_policy: BinaryPolicy,
+    *,
+    snapshot: Optional[TraversalResult] = None,
 ) -> tuple[str, int]:
     """Build file content blocks and return them with file count."""
     selected = select_files_for_content(
-        root=root, selection=selection, binary_policy=binary_policy
+        root=root, selection=selection, binary_policy=binary_policy, snapshot=snapshot
     )
     if not selected:
         return ("", 0)

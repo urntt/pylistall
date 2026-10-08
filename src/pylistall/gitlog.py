@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from pylistall.traversal import TraversalResult, scan_directory
+
 GIT_LOG_ALL: int = -1
 
 
@@ -59,52 +61,42 @@ def _sort_key(entry: GitEntry) -> tuple[str, int]:
     return (str(entry.git_path.resolve()).lower(), 0 if entry.is_dir else 1)
 
 
-def _find_git_entries(root: Path, recursive: bool) -> tuple[list[GitEntry], list[str]]:
-    """Find .git directories/files under root, depending on recursive mode."""
-    warnings: list[str] = []
-    entries: list[GitEntry] = []
-
-    if not recursive:
-        git_path = root / ".git"
-        if git_path.exists():
-            entries.append(GitEntry(git_path=git_path, is_dir=git_path.is_dir()))
-        # Defensive: if a filesystem ever reports both, warn and treat as two
-        # entries.
-        if git_path.is_dir() and git_path.is_file():
-            warnings.append(
-                "Both '.git' directory and '.git' file "
-                "appear to exist under root. "
-                "They were processed separately (directory first)."
-            )
-            entries = [
-                GitEntry(git_path=git_path, is_dir=True),
-                GitEntry(git_path=git_path, is_dir=False),
-            ]
-        entries.sort(key=_sort_key)
-        return entries, warnings
-
-    # Recursive search: include both files and directories named '.git'
-    try:
-        for path in root.rglob(".git"):
-            if path.exists():
-                entries.append(GitEntry(git_path=path, is_dir=path.is_dir()))
-    except OSError:
-        entries = []
-
+def _find_git_entries(
+    root: Path,
+    recursive: bool,
+    follow_links: bool = False,
+    *,
+    snapshot: Optional[TraversalResult] = None,
+) -> tuple[list[GitEntry], list[str]]:
+    """Discover repositories from the same entries used by the other collectors."""
+    if snapshot is None:
+        snapshot = scan_directory(root, recursive, follow_links)
+    entries = [
+        GitEntry(entry.path, entry.is_dir)
+        for entry in snapshot.entries
+        if entry.path.name == ".git"
+        and (entry.is_dir or entry.is_file)
+        and entry.skipped is None
+    ]
     entries.sort(key=_sort_key)
-    return entries, warnings
+    return entries, []
 
 
 def build_git_log_sections(
     root: Path,
     recursive: bool,
     count: Optional[int],
+    follow_links: bool = False,
+    *,
+    snapshot: Optional[TraversalResult] = None,
 ) -> tuple[str, list[str]]:
     """Build git log sections.
 
     Each section always starts with the absolute '.git' path line.
     """
-    entries, warnings = _find_git_entries(root=root, recursive=recursive)
+    entries, warnings = _find_git_entries(
+        root, recursive, follow_links, snapshot=snapshot
+    )
     if not entries:
         return ("", warnings)
 

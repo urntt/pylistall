@@ -17,7 +17,7 @@ pylistall/
 ├── VISION*.md                 product direction
 ├── docs/                      development and architecture, in both languages
 ├── .github/                   CI workflow and bilingual pull request template
-├── src/pylistall/              CLI, tree, selection, Git logs, clipboard
+├── src/pylistall/              CLI, shared traversal, tree, selection, Git logs, clipboard
 ├── tests/                     behavior and regression tests
 ├── scripts/                   unified checks, CI matrix and wheel smoke test
 ├── pyproject.toml             metadata, dependencies, build and check configuration
@@ -109,6 +109,11 @@ root and nested levels, incremental UTF-8 sampling, and Python 3.9-compatible
 dataclasses. No known-defect tests currently use `xfail`. Keep strict expected
 failure handling; any temporary marker needs a reason and removal plan. New
 regressions must fail normally.
+
+Traversal tests create real links in temporary directories, including Windows
+junctions. Symbolic-link tests skip only when Windows denies the required link
+privilege. They cover external targets, ancestor cycles, repeated aliases,
+broken links, exclusion consistency, and nested enumeration failures.
 
 ## Build and verify artifacts
 
