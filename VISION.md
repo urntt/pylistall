@@ -43,22 +43,20 @@ The repository provides behavior tests, uv dependency locking, Ruff checks, CI f
 the minimum and default Python versions on three platforms, and bilingual
 contributor guidance. These foundations enable developers and agents to
 continue work from a fresh checkout without relying on a previous conversation.
-The repository also defines a release workflow with index hash and installation
-verification. Publishing requires the service configuration in the
-[release guide](docs/releasing.md).
+The release workflow has completed a real release through TestPyPI, PyPI, and
+GitHub Releases, including index hash and installation verification. Service
+configuration and future releases follow the [release guide](docs/releasing.md).
 
 ## Next priorities
 
 These are future requirements, not current guarantees:
 
-1. Complete the first TestPyPI rehearsal and production release through the
-   documented workflow, then keep the process verified for future releases.
-2. Define and implement safer collection boundaries: sensitive-file exclusions,
+1. Define and implement safer collection boundaries: sensitive-file exclusions,
    a consistent symlink policy with cycle detection, and clearer error reporting.
    Decide how filename visibility in the tree should interact with these controls.
-3. Control total output volume and provide a useful preview, beyond the current
+2. Control total output volume and provide a useful preview, beyond the current
    per-file limit. Design a stdout-only mode for environments without a clipboard.
-4. Refine filtering and everyday usability using real projects and regression
+3. Refine filtering and everyday usability using real projects and regression
    evidence, with explicit migration notes for behavior changes.
 
 A GUI, cloud synchronization, content execution, and direct AI requests are outside
