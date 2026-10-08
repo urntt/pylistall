@@ -92,7 +92,7 @@ def _build_output(
             title = str(entry.git_path.resolve())
             text = gitlog._run_git_log(
                 entry.git_path.parent,
-                git_options.count,
+                gitlog.GIT_LOG_ALL if git_options.count is None else git_options.count,
                 check_size=builder.body_checker(title, "text"),
                 chunk_bytes=chunk_bytes,
             )
@@ -270,7 +270,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     args.disable = flatten_patterns(args.disable)
     if set(args.disable) - {"root", "tree", "git", "files"}:
         parser.error("--disable accepts only root, tree, git, files")
-    if {"root", "tree", "git", "files"}.issubset(args.disable):
+    enabled = {"root", "tree", "files"}
+    if args.git_log is not None:
+        enabled.add("git")
+    if not enabled - set(args.disable):
         parser.error("at least one output part must remain enabled")
     if args.overwrite and args.file is None:
         parser.error("--overwrite requires --file")

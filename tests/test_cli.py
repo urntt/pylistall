@@ -101,6 +101,7 @@ def test_git_without_repository(tmp_path, copied):
         ["-w"],
         ["-d", "bad"],
         ["-d", "root,tree,git,files"],
+        ["-d", "root,tree,files"],
         ["-M", "0"],
         ["-M", "-1"],
         ["-m", "-1"],
