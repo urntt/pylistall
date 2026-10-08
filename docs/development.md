@@ -104,6 +104,12 @@ Backend mocks verify commands and encodings, not actual OS integration.
 Output tests cover exact UTF-8 budgets, disabled collectors, dry-run destinations,
 file collisions, aliases, failure cleanup and preservation of existing files.
 A real disposable Git repository verifies Unicode log transport.
+Viewer tests cover literal paths, import fallback, TTY routing, pager selection,
+platform encoding and closed pipes. For manual integration use disposable short
+and long fixtures in an actual terminal: verify color, Unicode, automatic short
+exit, Space, `/`, `q`, `-n`, and Markdown redirection. Tests do not replace this
+terminal check. The runtime Rich dependency supplies syntax rendering, reusing the
+already locked version; preserve unrelated resolutions when maintaining the lock.
 Release tests also cover rejection of mixed artifacts, inconsistent metadata,
 missing notes, invalid tags, and changed remote hashes without network uploads.
 

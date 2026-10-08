@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+- 新增 Rich 终端分组与语法高亮，路径按字面量处理；重定向保持 Markdown，缺少 Rich 时静默回退。
+- 新增 `-n --no-pager`、PAGER／less／Git bundled less／more 选择、Unicode 传输及正常退出、关闭管道处理。
+- 将已锁定的 Rich 15.0.0 加入运行依赖，不升级其他包。
+
 - 默认复制改为展示；新增 `-c`、`-f`、`-w`、`-d`、`-D`、`-M`，移除 `-p`。
 - 单次结构化收集，生成带语言、路径转义及动态围栏的 Markdown。
 - 分块读取文件和 Git，准确预算与 dry-run；超限不交付部分结果。

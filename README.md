@@ -32,8 +32,9 @@ pylistall . -r -g 3 -d files
 pylistall . -r -o -D -M 100000 -f
 ```
 
-The collection path defaults to the current directory. Default operation displays
-the result and does not touch the clipboard. Pipe or redirect output to obtain
+The collection path defaults to the current directory. Interactive terminals show
+headings, colors and code highlighting without fences or line numbers. Default
+operation does not touch the clipboard. Pipe or redirect output to obtain
 Markdown. Status messages and warnings go to stderr.
 
 | Option | Behavior |
@@ -51,6 +52,7 @@ Markdown. Status messages and warnings go to stderr.
 | `-d --disable PARTS` | Omit `root`, `tree`, `git`, `files`; repeatable or comma-separated |
 | `-D --dry-run` | Collect and report exact Markdown size and destinations without copying/writing |
 | `-M --max-output-bytes N` | Positive total Markdown UTF-8 budget; default unlimited |
+| `-n --no-pager` | Disable interactive terminal paging |
 | `-h --help` | Show help |
 
 At least one output part must remain enabled. Disabling `files` avoids sampling
@@ -115,9 +117,24 @@ the root is checked; recursion groups repositories by absolute path. Each group
 uses oneline, decorated logs. Missing repositories, empty logs and Git failures
 have explicit markers. Git must be available on PATH.
 
+### Terminal paging
+
+Paging requires both stdin and stdout to be terminals. `PAGER` takes priority;
+otherwise pylistall finds `less`, including Git for Windows' bundled executable,
+then system `more`. Less defaults to `-FRX`: short output exits automatically,
+Space advances, `/` searches and `q` quits. `-n` disables paging; an empty `PAGER`
+also disables it. A configured command is split into executable/arguments without
+shell expansion. Missing or failed pagers display directly.
+
+More receives plain text in the platform encoding, which may replace characters
+unrepresentable in the current Windows codepage. Rich import failures silently
+fall back to Markdown. Redirected output is always Markdown without added ANSI.
+Clipboard and files remain canonical Markdown even when the terminal is styled.
+See [Git's pager defaults](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager).
+
 ## Output format
 
-For a directory with `README.txt` and `src/main.py`, `pylistall . -r -o` produces:
+For a directory with `README.txt` and `src/main.py`, redirected or copied Markdown is:
 
 ````markdown
 /Users/example/project
