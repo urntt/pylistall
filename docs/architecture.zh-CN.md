@@ -95,7 +95,7 @@ UTF-8、无 BOM、LF。收集和预算成功后才创建父目录，已有目录
 
 剪贴板仅在 `-c` 使用：macOS UTF-8 `pbcopy`、Windows UTF-16LE `clip`、Linux UTF-8
 `xclip -selection clipboard` 或 pyperclip。参数／根路径错误为 2，交付或预算失败为 1，
-下游关闭管道正常退出。移除 `-p` 的迁移见 [README](../README.zh-CN.md#从-031-迁移)。
+下游关闭管道正常退出。移除 `-p` 的迁移见[更新记录](../CHANGELOG.zh-CN.md#从-031-迁移)。
 
 ## 安全边界与当前限制
 

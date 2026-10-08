@@ -6,135 +6,85 @@
 
 [中文说明](README.zh-CN.md)
 
-pylistall is a cross-platform CLI for sharing project context with AI assistants,
-reviewers, or collaborators. Collect a directory tree, selected file contents and
-optional Git history. Display the result, copy Markdown, or save one local file.
-Python 3.9 or newer is required.
+`pylistall` is a cross-platform command-line tool that collects file contents under
+a directory and displays them in a structured format. It can also copy Markdown
+to the system clipboard or export it to a single file.
+
+It includes the absolute path and a tree-style directory structure. If the
+directory contains a `.git` repository, it can optionally include the Git commit log.
+
+This tool is designed for efficiently sharing project context with AI tools,
+debugging, documentation, or code review.
+
+---
+
+## Features
+
+* Display collected context in the terminal by default
+* Copy Markdown to the clipboard or save it to a single file (optional)
+* Tree-style directory structure and absolute root path
+* Recursive traversal of subdirectories (optional, disabled by default)
+* Include or omit files using glob patterns (optional, includes non-binary files by default)
+* Include binary files and Git logs (optional, disabled by default)
+* Choose output parts, preview collection, and limit total output size
+* Terminal headings, colors, code highlighting, and interactive paging
+* Cross-platform support: macOS, Windows, and Linux
+
+---
 
 ## Installation
 
-```sh
+Using PyPI:
+
+```bash
 python -m pip install pylistall
+```
+
+Or, from the project root (where `pyproject.toml` is located):
+
+```bash
+python -m pip install .
+```
+
+Verify installation:
+
+```bash
 pylistall --help
 ```
 
-For an unpublished checkout, use `python -m pip install .`. The changes below are
-unreleased; published behavior is described in [GitHub Releases](https://github.com/urntt/pylistall/releases).
+Uninstall:
+
+```bash
+python -m pip uninstall pylistall
+```
+
+---
 
 ## Usage
 
-```sh
+```bash
 pylistall [path] [options]
-pylistall . -r -o
-pylistall . -r -o -c
-pylistall . -r -o -f context.md
-pylistall . -r -g 3 -d files
-pylistall . -r -o -D -M 100000 -f
 ```
 
-The collection path defaults to the current directory. Interactive terminals show
-headings, colors and code highlighting without fences or line numbers. Default
-operation does not touch the clipboard. Pipe or redirect output to obtain
-Markdown. Status messages and warnings go to stderr.
+If `[path]` is not provided, the current directory (`.`) is used.
 
-| Option | Behavior |
-| --- | --- |
-| `-r --recursive` | Expand directories; otherwise collect immediate files only |
-| `-i --include PATTERN` | Restrict contents; repeatable or comma-separated |
-| `-o --omit [PATTERN]` | Omit contents; bare `-o` enables the defaults below |
-| `-b --binary [PATTERN]` | Include all binaries, or matching binaries only |
-| `-m --max-bytes N` | Per-file source-byte limit; mark truncated content |
-| `-g --git-log [N]` | All Git commits, or the last N; disabled by default |
-| `-l --follow-links` | Follow file and directory links, including external targets |
-| `-c --copy` | Additionally copy Markdown while still displaying |
-| `-f --file [DEST]` | Save one file and suppress terminal body; may combine with `-c` |
-| `-w --overwrite` | Permit replacing an output file; requires `-f` |
-| `-d --disable PARTS` | Omit `root`, `tree`, `git`, `files`; repeatable or comma-separated |
-| `-D --dry-run` | Collect and report exact Markdown size and destinations without copying/writing |
-| `-M --max-output-bytes N` | Positive total Markdown UTF-8 budget; default unlimited |
-| `-n --no-pager` | Disable interactive terminal paging |
-| `-h --help` | Show help |
+By default, the result is displayed without changing the clipboard. Interactive
+terminals use headings, colors and syntax highlighting without Markdown fences
+or line numbers. Pipes and redirection receive Markdown without added ANSI.
+Status messages and warnings go to stderr.
 
-At least one output part must remain enabled. Disabling `files` avoids sampling
-and reading contents; disabling `git` avoids Git queries. All destinations use the
-same enabled parts. Exceeding the total budget returns 1 and delivers no body,
-clipboard content or file. The budget includes headings, fences and newlines;
-it excludes status messages.
+---
 
-### Filters and links
+## Output Format
 
-Patterns match filenames and logical relative paths using `fnmatch`; repeated or
-comma-separated values trim whitespace and empty entries. Omission takes priority
-over inclusion and binary policy. Explicit `-i` can force binary inclusion. `-b`
-affects binaries only. Included bytes are decoded as UTF-8 with replacement, without
-extracting archives or interpreting images. Business logs and lock files remain eligible.
+Example input for a directory containing `README.txt` and `src/main.py`:
 
-Content filters do not hide tree names. Directories end in `/`; links are marked
-`@` and skipped by default. `-l` permits targets outside the root, and directory
-expansion still requires `-r`. Ancestor cycles and broken followed targets are
-skipped with warnings; repeated non-cyclic aliases remain separate. Omit rules
-check logical and resolved paths. An explicitly supplied root link is resolved.
+```bash
+cd /Users/example/project
+pylistall . -r -o -c
+```
 
-Bare `-o` covers these categories at the root and nested levels:
-
-- Git metadata, Python environments/caches, `build`, `dist`, `*.egg-info`,
-  `node_modules`, `.idea`, `.vscode`, `.gitignore`, `.DS_Store`, `Thumbs.db`.
-- Python/testing: `.nox`, `.hypothesis`, `.ipynb_checkpoints`, `__pypackages__`,
-  `.eggs`, `htmlcov`, `.coverage`, `.coverage.*`.
-- Frontend: `.next`, `.nuxt`, `.output`, `.svelte-kit`, `.turbo`, `.parcel-cache`,
-  `.vite`, `coverage`, `.nyc_output`, `*.tsbuildinfo`, `.eslintcache`, `.stylelintcache`.
-- Other generated files: `.cache`, `target`, `.gradle`, `.vs`, `*.swp`, `*.swo`,
-  `*~`, `desktop.ini`, `pylistall-output-*.md`.
-- Sensitive names: `.env`, `.env.*`, `.envrc`, `.pypirc`, `.netrc`, `id_rsa`,
-  `id_dsa`, `id_ecdsa`, `id_ed25519`, `*.key`, `*.pem`, `*.p12`, `*.pfx`,
-  `.aws/credentials`, `.streamlit/secrets.toml`.
-
-This list also excludes some examples and public certificates. It cannot detect
-arbitrary secrets and does not load `.gitignore`. Custom `-o PATTERN` does not
-enable defaults; combine both with `-o -o "custom/*"`. Review collected content
-before sharing. See [current boundaries](docs/architecture.md#safety-boundaries-and-current-limitations).
-
-### File destinations
-
-Bare `-f` saves in the **command's current directory**, using the local timestamp
-`pylistall-output-%Y-%m-%d-%H-%M-%S.md`. Relative destinations use that same current
-directory, independently of the collection root; absolute paths and `~` work too.
-An existing directory or trailing platform separator selects a directory with the
-default name. Otherwise the argument is the complete filename; no extension is added.
-
-Missing parents are created after successful collection and budget validation.
-Existing names, including same-second collisions, fail unless `-w` is supplied.
-Files use UTF-8 without BOM and LF; a failed overwrite preserves the original.
-The active destination and its aliases are excluded from content even without
-`-o`, while an existing name remains in the tree. `-D` previews size/destination
-without creating directories, writing files or copying. Failures return nonzero;
-stderr reports each completed destination.
-
-### Git history
-
-`-g` discovers `.git` directories and worktree pointer files. Without `-r`, only
-the root is checked; recursion groups repositories by absolute path. Each group
-uses oneline, decorated logs. Missing repositories, empty logs and Git failures
-have explicit markers. Git must be available on PATH.
-
-### Terminal paging
-
-Paging requires both stdin and stdout to be terminals. `PAGER` takes priority;
-otherwise pylistall finds `less`, including Git for Windows' bundled executable,
-then system `more`. Less defaults to `-FRX`: short output exits automatically,
-Space advances, `/` searches and `q` quits. `-n` disables paging; an empty `PAGER`
-also disables it. A configured command is split into executable/arguments without
-shell expansion. Missing or failed pagers display directly.
-
-More receives plain text in the platform encoding, which may replace characters
-unrepresentable in the current Windows codepage. Rich import failures silently
-fall back to Markdown. Redirected output is always Markdown without added ANSI.
-Clipboard and files remain canonical Markdown even when the terminal is styled.
-See [Git's pager defaults](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager).
-
-## Output format
-
-For a directory with `README.txt` and `src/main.py`, redirected or copied Markdown is:
+Example clipboard text (file export and redirection use the same Markdown):
 
 ````markdown
 /Users/example/project
@@ -162,27 +112,402 @@ print("Hello World!")
 ```
 ````
 
-The absolute root is first. Optional Git groups precede files. Paths are escaped
-as literal Markdown; known file types get language tags, unknown types use `text`.
-Fence lengths grow to avoid content backtick collisions. Content ordering and
-`[...TRUNCATED...]` markers remain visible.
+Notes:
 
-## Migration from 0.3.1
+* The root is first, followed by the tree, optional Git groups, and file contents.
+* The tree reflects the filesystem; content filters do not hide tree names.
+* `-r` controls directory expansion and `-l` controls link following.
+* Directories end with `/`; links are marked `@` and skipped by default.
+* Markdown paths are escaped literally. Known file types have language tags;
+  unknown types use `text`. Fences grow to avoid backtick collisions.
+* Content ordering and `[...TRUNCATED...]` markers remain visible.
 
-Default clipboard copying becomes default display. Add `-c` to keep copying;
-use `-f` to export without displaying the body. `-p --print` is removed: omit it
-for display, or replace it with `-c` for display plus copying. Use `-d files` to
-omit file names and contents while retaining other parts. `-h` remains help.
-Markdown gains headings, language tags and collision-safe fences.
+---
 
-## Clipboard support
+## Options
 
-Only `-c` needs a working clipboard: macOS uses `pbcopy`, Windows `clip`, and
-Linux `xclip` or pyperclip. Default display and file export work without a desktop.
+### Recursive traversal
 
-## Contributing and releases
+**Optional, disabled by default.**
 
-See [development](docs/development.md), [vision](VISION.md), and
-[architecture](docs/architecture.md). Changes are tracked in the
-[changelog](CHANGELOG.md); maintainers follow [releasing](docs/releasing.md).
-The project uses the MIT license.
+```text
+-r, --recursive
+```
+
+Recursively include subdirectories. When enabled:
+
+* The tree includes nested files and directories.
+* Content collection includes matching files in nested directories.
+* Git discovery checks nested repositories when `-g` is also enabled.
+
+---
+
+### Copy output to clipboard
+
+**Optional, disabled by default.**
+
+```text
+-c, --copy
+```
+
+Additionally copy the complete Markdown to the clipboard. The terminal still
+displays the result unless `-f` is supplied. Only this option needs a working
+clipboard backend.
+
+---
+
+### Save output to a file
+
+**Optional, disabled by default.**
+
+```text
+-f, --file [DEST]
+```
+
+Save all enabled output parts to one file and suppress the terminal body.
+Combine with `-c` to save and copy the same Markdown.
+
+Destination rules:
+
+* Bare `-f` saves in the **command's current directory** using local time:
+  `pylistall-output-%Y-%m-%d-%H-%M-%S.md`.
+* Relative paths use that same current directory, independently of the collection
+  root. Absolute paths and `~` are supported.
+* An existing directory or trailing platform separator selects a directory with
+  the default filename. Otherwise `DEST` is the complete filename.
+* Custom filenames do not receive an automatic extension.
+* Missing parents are created after collection and budget validation succeed.
+* Existing names and same-second collisions fail unless `-w` is provided.
+* Files use UTF-8 without BOM and LF. Failed overwrites preserve the original.
+* The active destination and its aliases are excluded from contents even without
+  `-o`; existing names may still appear in the tree.
+
+Failures return nonzero, and stderr reports each completed destination.
+
+Examples:
+
+```bash
+pylistall -r -o -f
+pylistall -r -o -f context.md
+pylistall -r -o -f ../exports/context -c
+```
+
+---
+
+### Overwrite an output file
+
+**Optional, disabled by default; requires `-f`.**
+
+```text
+-w, --overwrite
+```
+
+Allow replacing an existing output file. A directory cannot be overwritten as a
+file. Replacement occurs after a same-directory temporary file is fully written;
+failure cleans the incomplete file and preserves the original.
+
+```bash
+pylistall -r -o -f context.md -w
+```
+
+---
+
+### Disable output parts
+
+**Optional, repeatable, disabled by default.**
+
+```text
+-d, --disable PARTS
+```
+
+Omit `root`, `tree`, `git`, or `files` from every destination. Repeat the option or
+use comma-separated values. At least one active output part must remain enabled.
+
+Disabling `files` avoids sampling and reading file contents; disabling `git`
+avoids Git queries. Copying, saving and display use the same enabled parts.
+
+```bash
+pylistall -r -g 3 -d files
+pylistall -d root,tree -d git -c
+```
+
+---
+
+### Include only specific files
+
+**Optional, repeatable, disabled by default.**
+
+```text
+-i, --include PATTERN
+```
+
+Include only files matching glob patterns. Repeat the option or use comma-separated
+patterns; surrounding whitespace and empty entries are ignored. Matching uses
+`fnmatch` against the filename and logical relative path.
+
+When `-i` is used:
+
+* Only matching files are included in content output.
+* Matching binary files can be included even without `-b`.
+* Matching omit rules still take precedence.
+
+---
+
+### Omit specific files
+
+**Optional, repeatable, disabled by default.**
+
+```text
+-o, --omit [PATTERN]
+```
+
+Exclude contents matching glob patterns. Repeated and comma-separated values are
+trimmed; empty entries are ignored. Omissions take precedence over `-i` and `-b`,
+checking both logical and resolved paths when links are followed.
+
+Bare `-o` enables the default set at the root and nested levels:
+
+* Git metadata, Python environments/caches, `build`, `dist`, `*.egg-info`,
+  `node_modules`, `.idea`, `.vscode`, `.gitignore`, `.DS_Store`, `Thumbs.db`.
+* Python/testing: `.nox`, `.hypothesis`, `.ipynb_checkpoints`, `__pypackages__`,
+  `.eggs`, `htmlcov`, `.coverage`, `.coverage.*`.
+* Frontend: `.next`, `.nuxt`, `.output`, `.svelte-kit`, `.turbo`, `.parcel-cache`,
+  `.vite`, `coverage`, `.nyc_output`, `*.tsbuildinfo`, `.eslintcache`, `.stylelintcache`.
+* Other generated files: `.cache`, `target`, `.gradle`, `.vs`, `*.swp`, `*.swo`,
+  `*~`, `desktop.ini`, `pylistall-output-*.md`.
+* Sensitive names: `.env`, `.env.*`, `.envrc`, `.pypirc`, `.netrc`, `id_rsa`,
+  `id_dsa`, `id_ecdsa`, `id_ed25519`, `*.key`, `*.pem`, `*.p12`, `*.pfx`,
+  `.aws/credentials`, `.streamlit/secrets.toml`.
+
+The list also excludes some examples and public certificates. It cannot detect
+arbitrary secrets and does not load `.gitignore`. Business logs and dependency
+locks are retained. Excluding contents leaves names visible in the tree.
+
+Default patterns beginning with `**/` also apply at the root. Custom patterns keep
+ordinary `fnmatch` behavior and do not automatically enable defaults. To combine:
+
+```bash
+pylistall -o -o "README.md,test_cases/*"
+```
+
+---
+
+### Include binary files
+
+**Optional, disabled by default.**
+
+```text
+-b, --binary [PATTERN]
+```
+
+Controls binary inclusion without affecting text files. Included bytes are decoded
+as UTF-8 with replacement; archives, images and documents are not converted or extracted.
+
+Precedence rules:
+
+1. `-o` always omits matching files, including binaries.
+2. `-i` can force-include specific binaries.
+3. `-b` controls only remaining binaries.
+
+Inclusion rules:
+
+* Not provided → binaries excluded, unless forced by `-i`.
+* Bare `-b` → include all binaries.
+* `-b PATTERN` → include matching binaries only.
+
+```bash
+pylistall -b
+pylistall -b "*.zip,photo.png"
+pylistall -i "run.exe"
+```
+
+---
+
+### Git log
+
+**Optional, disabled by default.**
+
+```text
+-g, --git-log [N]
+```
+
+Include Git history. Bare `-g` includes all entries; `-g N` includes the last N
+entries, where N must be positive.
+
+Rules:
+
+* Without `-r`, check only the root `.git` directory or worktree pointer file.
+* With `-r`, discover nested repositories.
+* Groups are sorted by absolute `.git` path, case-insensitively.
+* Logs use oneline and decorate; Markdown groups have path subheadings.
+* Missing repositories, empty logs and Git failures have explicit markers.
+* Git must be available on PATH. `-d git` suppresses Git queries and output.
+
+---
+
+### Limit file read size
+
+**Optional, unlimited by default.**
+
+```text
+-m, --max-bytes N
+```
+
+Limit source bytes read per file. N must be nonnegative. Contents exceeding the
+limit receive `[...TRUNCATED...]`. This does not limit the tree or Git logs.
+
+---
+
+### Follow links
+
+**Optional, disabled by default.**
+
+```text
+-l, --follow-links
+```
+
+Follow file and directory links, including targets outside the root. Directory
+expansion still requires `-r`. Contents use logical relative paths; omit rules
+also check resolved targets. Ancestor cycles and broken followed targets are
+skipped with warnings, while repeated non-cyclic aliases remain separate.
+An explicitly supplied root link is resolved even without this option.
+
+---
+
+### Preview collection
+
+**Optional, disabled by default.**
+
+```text
+-D, --dry-run
+```
+
+Collect accurately and report Markdown UTF-8 bytes, selected file count, skipped
+entries and destinations on stderr. No body is displayed, nothing is copied, and
+no directories or files are created. Combine with `-c` or `-f` to preview them.
+
+```bash
+pylistall -r -o -D -c -f context.md
+```
+
+---
+
+### Limit total output size
+
+**Optional, unlimited by default.**
+
+```text
+-M, --max-output-bytes N
+```
+
+Set a positive UTF-8 byte budget for the complete enabled Markdown, including
+headings, fences and newlines. Colors, summaries and status messages do not count.
+Exceeding the budget returns 1 and delivers no partial terminal body, clipboard
+content or file. Dry-run reports the same size as actual Markdown.
+
+---
+
+### Disable terminal paging
+
+**Optional; paging is automatic in interactive terminals.**
+
+```text
+-n, --no-pager
+```
+
+Paging requires both stdin and stdout to be terminals. `PAGER` takes priority;
+otherwise pylistall looks for `less`, including Git for Windows' bundled executable,
+then system `more`. Less defaults to `-FRX`: short output exits automatically,
+Space advances, `/` searches and `q` quits. An empty `PAGER` also disables paging.
+Configured commands use executable/arguments without shell expansion.
+
+Missing or failed pagers display directly. More receives plain platform-encoded
+text; characters unavailable in the current Windows codepage may be replaced.
+Rich import failures silently fall back to Markdown. Clipboard and file outputs
+always remain Markdown. See [Git's pager defaults](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager).
+
+---
+
+### Help
+
+```text
+-h, --help
+```
+
+Display the command's usage and available options.
+
+---
+
+## Examples
+
+Basic usage:
+
+```bash
+pylistall
+```
+
+Recursively collect with default omissions and three recent Git commits:
+
+```bash
+pylistall -r -o -g 3
+```
+
+Copy context or save it to a file:
+
+```bash
+pylistall -r -o -c
+pylistall -r -o -f context.md
+```
+
+Include only Python files, or omit test files:
+
+```bash
+pylistall -i "*.py"
+pylistall -o "test/test_*"
+```
+
+Preview destinations with a total budget:
+
+```bash
+pylistall -r -o -D -M 100000 -c -f context.md
+```
+
+---
+
+## Clipboard Support
+
+Platform-specific clipboard backends:
+
+| Platform | Backend |
+| --- | --- |
+| macOS | `pbcopy` |
+| Windows | `clip` |
+| Linux | `xclip` / `pyperclip` |
+
+Only `-c` needs a working desktop clipboard. Display and file export work without
+one. Review selected content before sharing; current boundaries are documented in
+[architecture](docs/architecture.md#safety-boundaries-and-current-limitations).
+
+---
+
+## Requirements
+
+Python 3.9 or higher. Git is required only when collecting Git history.
+
+---
+
+## License
+
+MIT License
+
+## Contributing
+
+See the [development guide](docs/development.md) for setup, checks, builds, and
+contribution steps. Product direction is in the [vision](VISION.md); module
+responsibilities and data flow are in [architecture](docs/architecture.md).
+
+## Releases
+
+See the [changelog](CHANGELOG.md) for version changes and migration notes, and
+[GitHub Releases](https://github.com/urntt/pylistall/releases) for published versions.
+Maintainers use the [release guide](docs/releasing.md).

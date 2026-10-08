@@ -113,7 +113,7 @@ completed operations on stderr; any failed destination returns 1.
 Only copying needs desktop transport: UTF-8 pbcopy on macOS, UTF-16LE clip on
 Windows, UTF-8 xclip or pyperclip on Linux. Argument/root errors return 2 and budget
 or delivery errors return 1. Closed downstream pipes exit normally. See the
-[migration](../README.md#migration-from-031) for removal of `-p`.
+[migration notes](../CHANGELOG.md#migration-from-031) for removal of `-p`.
 
 ## Safety boundaries and current limitations
 
