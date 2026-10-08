@@ -39,9 +39,9 @@ print(f"Verified isolated wheel: {installed['Version']} ({sys.version.split()[0]
 """
 
 
-def main() -> None:
+def verify_wheel(artifacts: Path) -> None:
+    """Check a distribution pair using the active project's metadata."""
     root = Path(__file__).resolve().parent.parent
-    artifacts = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "dist"
     wheels = list(artifacts.glob("*.whl"))
     sources = list(artifacts.glob("*.tar.gz"))
     if len(wheels) != 1 or len(sources) != 1:
@@ -78,4 +78,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    root = Path(__file__).resolve().parent.parent
+    artifacts = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "dist"
+    verify_wheel(artifacts)

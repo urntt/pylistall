@@ -21,6 +21,7 @@ def main() -> None:
     }
     print(f"checks={json.dumps(matrix)}")
     print(f"python={json.dumps(versions)}")
+    print(f"default_python={versions[1]}")
 
 
 if __name__ == "__main__":
