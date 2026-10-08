@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import codecs
 import fnmatch
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
+BINARY_SAMPLE_BYTES = 8192
 
 DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
     # Git
@@ -79,7 +81,7 @@ BINARY_EXTENSIONS: frozenset[str] = frozenset(
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class SelectionOptions:
     """Options for selecting and reading file contents."""
 
@@ -89,7 +91,7 @@ class SelectionOptions:
     max_bytes: Optional[int]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class BinaryPolicy:
     """Binary inclusion policy."""
 
@@ -97,7 +99,7 @@ class BinaryPolicy:
     patterns: tuple[str, ...]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class SelectedFile:
     """Represents a file selected for content output."""
 
@@ -124,7 +126,14 @@ def parse_omit_patterns(raw_omit: Sequence[str]) -> tuple[str, ...]:
     user_patterns = flatten_patterns(user_items)
 
     if enable_default:
-        return tuple(DEFAULT_OMIT_PATTERNS) + tuple(user_patterns)
+        # fnmatch requires a prefix for **/. Derive root variants from the
+        # default rules while preserving custom pattern matching semantics.
+        root_patterns = tuple(
+            pattern.removeprefix("**/")
+            for pattern in DEFAULT_OMIT_PATTERNS
+            if pattern.startswith("**/")
+        )
+        return DEFAULT_OMIT_PATTERNS + root_patterns + user_patterns
     return tuple(user_patterns)
 
 
@@ -162,23 +171,36 @@ def is_probably_binary(path: Path) -> bool:
 
     Strategy:
     - Fast check by extension.
-    - Byte sampling: NUL byte or high ratio of non-text bytes.
+    - Byte sampling:
+      1. NUL byte check.
+      2. Strict incremental UTF-8 decode check, allowing a split sample tail.
+      3. Fallback non-text byte ratio check.
     """
     if path.suffix.lower() in BINARY_EXTENSIONS:
         return True
 
     try:
         with path.open("rb") as handle:
-            sample = handle.read(8192)
+            data = handle.read(BINARY_SAMPLE_BYTES + 1)
     except OSError:
         # If we cannot read it safely, treat it as binary.
         return True
 
+    sample = data[:BINARY_SAMPLE_BYTES]
     if not sample:
         return False
 
     if b"\x00" in sample:
         return True
+
+    try:
+        # Only defer an incomplete trailing character if there is more data.
+        # At EOF, incomplete sequences must still fail strict decoding.
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="strict")
+        decoder.decode(sample, final=len(data) <= BINARY_SAMPLE_BYTES)
+        return False
+    except UnicodeDecodeError:
+        pass
 
     printable = set(range(32, 127))
     allowed_whitespace = {9, 10, 12, 13}  # \t, \n, \f, \r
@@ -235,9 +257,9 @@ def _is_included(
     """Check include patterns against filename and relative path."""
     if not include_patterns:
         return True
-    return matches_any(filename,
-                       include_patterns) or matches_any(rel_str,
-                                                        include_patterns)
+    return matches_any(filename, include_patterns) or matches_any(
+        rel_str, include_patterns
+    )
 
 
 def _is_omitted(
@@ -248,9 +270,7 @@ def _is_omitted(
     """Check omit patterns against filename and relative path."""
     if not omit_patterns:
         return False
-    return matches_any(filename,
-                       omit_patterns) or matches_any(rel_str,
-                                                     omit_patterns)
+    return matches_any(filename, omit_patterns) or matches_any(rel_str, omit_patterns)
 
 
 def _binary_allowed_by_b(
@@ -263,9 +283,9 @@ def _binary_allowed_by_b(
         return False
     if not policy.patterns:
         return True
-    return matches_any(filename,
-                       policy.patterns) or matches_any(rel_str,
-                                                       policy.patterns)
+    return matches_any(filename, policy.patterns) or matches_any(
+        rel_str, policy.patterns
+    )
 
 
 def select_files_for_content(
@@ -315,9 +335,9 @@ def build_content_sections(
     binary_policy: BinaryPolicy,
 ) -> tuple[str, int]:
     """Build file content blocks and return them with file count."""
-    selected = select_files_for_content(root=root,
-                                        selection=selection,
-                                        binary_policy=binary_policy)
+    selected = select_files_for_content(
+        root=root, selection=selection, binary_policy=binary_policy
+    )
     if not selected:
         return ("", 0)
 
@@ -325,8 +345,8 @@ def build_content_sections(
     for item in selected:
         content = read_text(item.absolute_path, max_bytes=selection.max_bytes)
         chunks.append(f"`{item.display_name}`:\n")
-        chunks.append("```\n")
+        chunks.append("``````````\n")
         chunks.append(f"{content}\n")
-        chunks.append("```\n\n")
+        chunks.append("``````````\n\n")
 
     return ("".join(chunks).rstrip() + "\n", len(selected))

@@ -77,33 +77,32 @@ cd /Users/example/project
 pylistall . -r -o -g
 ```
 
-Example output:
+Example clipboard text:
 
-````text
+```````````text
 /Users/example/project
+``````````
 ├── .git/
-│   ├── HEAD
 │   ├── config
-│   └── ...
+│   └── HEAD
 ├── src/
 │   └── main.py
 └── README.txt
+``````````
 
 /Users/example/project/.git
 a1b2c3d (HEAD -> main) Initial commit
 
 `README.txt`:
-
-```
-This is an exmaple Project.
-```
+``````````
+This is an example project.
+``````````
 
 `src/main.py`:
-
-```
+``````````
 print("Hello World!")
-```
-````
+``````````
+```````````
 
 Notes:
 
@@ -117,6 +116,8 @@ Notes:
 
 ### Recursive traversal
 
+**Optional, disabled by default.**
+
 ```bash
 -r, --recursive
 ```
@@ -129,46 +130,49 @@ When enabled:
 * Copied file content will include files in all these directories
 * Will try to find Git logs in all directories
 
-**Optional, disabled by default.**
-
 ---
 
 ### Print copied content
+
+**Optional, disabled by default.**
 
 ```bash
 -p, --print
 ```
 
-Print the full generated output to stdout.
-
-**Optional, disabled by default.**
+Print the full generated output to stdout before copying it to the clipboard.
+This option still requires a working clipboard backend.
 
 ---
 
 ### Include only specific files
 
+**Optional, repeatable, disabled by default.**
+
 ```bash
 -i, --include PATTERN
 ```
 
-Include only files matching glob patterns, using Comma-separated patterns.
+Include only files matching glob patterns. Repeat the option or use comma-separated
+patterns; surrounding whitespace and empty entries are ignored.
 
 When `-i` is used:
 
 * Only matching files are included in content output (whitelist mode)
 * `-i` can force-include binary files even if `-b` is not provided
 
-**Optional, repeatable, disabled by default.**
-
 ---
 
 ### Omit specific files
+
+**Optional, repeatable, disabled by default.**
 
 ```bash
 -o, --omit [PATTERN]
 ```
 
-Exclude files matching glob patterns, using Comma-separated patterns.
+Exclude files matching glob patterns. Repeat the option or use comma-separated
+patterns; surrounding whitespace and empty entries are ignored.
 
 Behavior:
 
@@ -176,28 +180,34 @@ Behavior:
   The default set includes:
   `.git/**`, `**/__pycache__/**`, `**/.pytest_cache/**`, `**/.mypy_cache/**`, `**/.ruff_cache/**`, `**/.tox/**`, `**/.venv/**`, `**/venv/**`, `**/build/**`, `**/dist/**`, `**/*.egg-info/**`, `**/node_modules/**`, `**/.idea/**`, `**/.vscode/**`, `**/.gitignore`, `**/.DS_Store`, `**/Thumbs.db`
 
+  Default patterns beginning with `**/` also apply at the target directory root.
+  For example, both `.venv/config.txt` and `nested/.venv/config.txt` are omitted.
+  Custom patterns retain their existing `fnmatch` matching behavior.
+
 * If both default and custom omit rules are desired, repeat `-o`:
 
 ```bash
 pylistall -o -o "README.md,test_cases/*"
 ```
 
-**Optional, repeatable, disabled by default.**
-
 ---
 
-### Binary files
+### Include binary files
+
+**Optional, disabled by default.**
 
 ```bash
 -b, --binary [PATTERN]
 ```
 
 Controls whether binary files are included in content output.
-Does not affact non-binary files.
+Does not affect non-binary files.
+Included bytes are decoded as UTF-8 with replacement; archives, images, and
+documents are not converted or extracted.
 
 Precedence rules:
 
-1. `-o` always omits matching files (including binariy files).
+1. `-o` always omits matching files (including binary files).
 2. `-i` can force-include specific binary files.
 3. `-b` controls only remaining binary files.
 
@@ -219,11 +229,11 @@ Default set of binary files:
 
   `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.ico`, `.pdf`, `.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.bz2`, `.xz`, `.exe`, `.dll`, `.so`, `.dylib`, `.bin`, `.dat`, `.class`, `.jar`, `.pyc`, `.pyo`, `.woff`, `.woff2`, `.ttf`, `.otf`, `.mp3`, `.wav`, `.flac`, `.mp4`, `.mov`, `.mkv`, `.avi`, `.doc`, `.docx`
 
-**Optional, disabled by default.**
-
 ---
 
 ### Git log
+
+**Optional, disabled by default.**
 
 ```bash
 -g, --git-log [N]
@@ -245,15 +255,13 @@ Rules:
 * Each Git log group is prefixed with the absolute `.git` path.
 * Multiple `.git` are printed as separate groups.
 
-  When multiple `.git` entries are found:
-  * They are sorted by path (case-insensitive), separated by blank lines.
-  * If both a `.git` directory and a `.git` file exist at the same path, the directory is printed first and the file second.
-
-**Optional, disabled by default.**
+* Groups are sorted by path (case-insensitive), separated by blank lines.
 
 ---
 
 ### Limit file read size
+
+**Optional, disabled by default.**
 
 ```bash
 -m, --max-bytes N
@@ -261,8 +269,6 @@ Rules:
 
 Limit the maximum number of bytes read per file.
 If content exceeds `N` bytes, it is truncated and marked.
-
-**Optional, disabled by default.**
 
 ---
 
@@ -298,7 +304,7 @@ Include only Python files:
 pylistall -i "*.py"
 ```
 
-Exclude all files that starts with `test_` in `test` folder:
+Exclude all files that start with `test_` in the `test` folder:
 
 ```bash
 pylistall -o "test/test_*"
@@ -316,6 +322,11 @@ Platform-specific clipboard backends:
 | Windows  | clip              |
 | Linux    | xclip / pyperclip |
 
+Normal collection needs a desktop clipboard backend. The tool does not
+automatically exclude secrets or confine symbolic links to the target directory.
+Review the files you select before sharing; current boundaries are documented in
+[architecture](docs/architecture.md#safety-boundaries-and-current-limitations).
+
 ---
 
 ## Requirements
@@ -327,3 +338,9 @@ Python 3.9 or higher
 ## License
 
 MIT License
+
+## Contributing
+
+See the [development guide](docs/development.md) for setup, checks, builds, and
+contribution steps. Product direction is in the [vision](VISION.md); module
+responsibilities and data flow are in [architecture](docs/architecture.md).

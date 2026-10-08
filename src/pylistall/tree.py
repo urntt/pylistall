@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class TreeEntry:
     """Represents a filesystem entry for tree rendering."""
 
@@ -33,9 +33,7 @@ def _list_children(path: Path) -> list[TreeEntry]:
         for item in path.iterdir():
             is_dir = item.is_dir()
             name = item.name + ("/" if is_dir else "")
-            entries.append(TreeEntry(name=name,
-                                     is_dir=is_dir,
-                                     children=tuple()))
+            entries.append(TreeEntry(name=name, is_dir=is_dir, children=tuple()))
     except OSError:
         # If the directory cannot be read, treat it as empty.
         return []

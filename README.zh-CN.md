@@ -77,33 +77,32 @@ cd /Users/example/project
 pylistall . -r -o -g
 ```
 
-示例输出：
+剪贴板文本示例：
 
-````text
+```````````text
 /Users/example/project
+``````````
 ├── .git/
-│   ├── HEAD
 │   ├── config
-│   └── ...
+│   └── HEAD
 ├── src/
 │   └── main.py
 └── README.txt
+``````````
 
 /Users/example/project/.git
 a1b2c3d (HEAD -> main) Initial commit
 
 `README.txt`:
-
-```
-This is an exmaple Project.
-```
+``````````
+This is an example project.
+``````````
 
 `src/main.py`:
-
-```
+``````````
 print("Hello World!")
-```
-````
+``````````
+```````````
 
 注意事项：
 
@@ -117,6 +116,8 @@ print("Hello World!")
 
 ### 递归遍历
 
+**可选，默认禁用。**
+
 ```bash
 -r, --recursive
 ```
@@ -129,46 +130,47 @@ print("Hello World!")
 * 会复制以上所有文件夹里的文件内容。
 * 还会尝试在这些文件夹里寻找 Git 日志。
 
-**可选，默认禁用。**
-
 ---
 
 ### 打印复制的内容
+
+**可选，默认禁用。**
 
 ```bash
 -p, --print
 ```
 
-把生成的全部复制内容输出到 stdout。
-
-**可选，默认禁用。**
+在复制到剪贴板之前，把生成的全部内容输出到 stdout。
+此选项仍需要可用的剪贴板后端。
 
 ---
 
 ### 仅包含指定文件
 
+**可选，可重复使用，默认禁用。**
+
 ```bash
 -i, --include PATTERN
 ```
 
-仅包含匹配 glob 模式的文件，使用逗号分隔。
+仅包含匹配 glob 模式的文件。可重复选项或用逗号分隔模式，首尾空白和空项会被忽略。
 
 当启用 `-i` 时：
 
-* 只有符合的文件文件会被复制文件内容（白名单模式）
+* 只有符合条件的文件会被包含到内容输出中
 * `-i` 可以强制包含二进制文件，即便没有 `-b`
-
-**可选，可重复使用，默认禁用。**
 
 ---
 
 ### 排除指定文件
 
+**可选，可重复使用，默认禁用。**
+
 ```bash
 -o, --omit [PATTERN]
 ```
 
-排除匹配 glob 模式的文件，使用逗号分隔。
+排除匹配 glob 模式的文件。可重复选项或用逗号分隔模式，首尾空白和空项会被忽略。
 
 行为：
 
@@ -176,17 +178,20 @@ print("Hello World!")
   默认忽略集包含：
   `.git/**`，`**/__pycache__/**`，`**/.pytest_cache/**`，`**/.mypy_cache/**`，`**/.ruff_cache/**`，`**/.tox/**`，`**/.venv/**`，`**/venv/**`，`**/build/**`，`**/dist/**`，`**/*.egg-info/**`，`**/node_modules/**`，`**/.idea/**`，`**/.vscode/**`，`**/.gitignore`，`**/.DS_Store`，`**/Thumbs.db`
 
+  以 `**/` 开头的默认规则也会作用于目标目录根层级。例如，`.venv/config.txt`
+  和 `nested/.venv/config.txt` 都会被排除。自定义模式保持现有的 `fnmatch` 匹配行为。
+
 * 如果想要在启用默认忽略集的同时忽略其他自定义规则，请重复使用 `-o`：
 
 ```bash
 pylistall -o -o "README.md,test_cases/*"
 ```
 
-**可选，可重复使用，默认禁用。**
-
 ---
 
-### 二进制文件
+### 包含二进制文件
+
+**可选，默认禁用。**
 
 ```bash
 -b, --binary [PATTERN]
@@ -194,6 +199,7 @@ pylistall -o -o "README.md,test_cases/*"
 
 控制是否复制二进制文件的内容。
 不会影响非二进制文件。
+包含的字节以 UTF-8 解码，无法解码的部分替换显示；不会转换或解压文档、图片和压缩包。
 
 优先级规则：
 
@@ -219,11 +225,11 @@ pylistall -i "run.exe"
 
   `.png`，`.jpg`，`.jpeg`，`.gif`，`.webp`，`.bmp`，`.ico`，`.pdf`，`.zip`，`.rar`，`.7z`，`.tar`，`.gz`，`.bz2`，`.xz`，`.exe`，`.dll`，`.so`，`.dylib`，`.bin`，`.dat`，`.class`，`.jar`，`.pyc`，`.pyo`，`.woff`，`.woff2`，`.ttf`，`.otf`，`.mp3`，`.wav`，`.flac`，`.mp4`，`.mov`，`.mkv`，`.avi`，`.doc`，`.docx`
 
-**可选，默认禁用。**
-
 ---
 
 ### 包含 Git 日志
+
+**可选，默认禁用。**
 
 ```bash
 -g, --git-log [N]
@@ -245,24 +251,20 @@ pylistall -i "run.exe"
 * 每一组 Git 日志前都会打印 `.git` 所在的绝对路径。
 * 多个 `.git` 中的日志会被分组打印。
 
-  当找到多个 `.git` 时：
-  * 他们会被以路径排序（大小写不敏感），以空行分隔。
-  * 如果一个 `.git` 目录和一个 `.git` 文件在同一个文件夹里，则会先打印 `.git` 目录，再打印 `.git` 文件。
-
-**可选，默认禁用。**
+* 日志组按路径排序（大小写不敏感），以空行分隔。
 
 ---
 
 ### 限制文件读取大小
 
+**可选，默认禁用。**
+
 ```bash
---max-bytes N
+-m, --max-bytes N
 ```
 
 限制每个文件读取的最大字节数。
 如果文件内容超过了 `N` 字节，则会被截断并标记。
-
-**可选，默认禁用。**
 
 ---
 
@@ -314,6 +316,9 @@ pylistall -o "test/test_*"
 * Windows：`clip`
 * Linux：`xclip` 或 `pyperclip` 作为备用方案
 
+正常收集需要桌面剪贴板后端。工具不会自动排除秘密信息，也不会把符号链接限制在目标目录内。
+分享前请检查选定文件；当前边界见[架构文档](docs/architecture.zh-CN.md#安全边界与当前限制)。
+
 ---
 
 ## 环境要求
@@ -325,3 +330,8 @@ Python 3.9 或更高版本
 ## 许可证
 
 MIT License
+
+## 参与开发
+
+环境准备、检查、构建和贡献步骤见[开发指南](docs/development.zh-CN.md)。
+产品方向见[愿景](VISION.zh-CN.md)，模块职责与数据流见[架构文档](docs/architecture.zh-CN.md)。

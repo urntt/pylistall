@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+
 import pyperclip
 
 
@@ -36,5 +37,6 @@ def copy_to_clipboard(text: str) -> None:
         pyperclip.copy(text)
         return
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        raise RuntimeError("Clipboard copy failed. "
-                           "Install xclip or pyperclip.") from exc
+        raise RuntimeError(
+            "Clipboard copy failed. Install xclip or pyperclip."
+        ) from exc

@@ -12,6 +12,7 @@ from pylistall.selection import (
     BinaryPolicy,
     SelectionOptions,
     build_content_sections,
+    flatten_patterns,
     parse_binary_policy,
     parse_omit_patterns,
 )
@@ -19,7 +20,7 @@ from pylistall.tree import build_tree_text
 from pylistall.util import copy_to_clipboard
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class OutputResult:
     """Represents the final output and metadata."""
 
@@ -38,10 +39,11 @@ def _build_output(
     chunks: list[str] = []
 
     # 1) Root + tree (tree is independent from all filters except -r)
+    #    Uses 10 backticks as fence
     chunks.append(f"{root.resolve()}\n")
     tree_text = build_tree_text(root=root, recursive=selection.recursive)
     if tree_text:
-        chunks.append(f"{tree_text}\n\n")
+        chunks.append(f"``````````\n{tree_text}\n``````````\n\n")
     else:
         chunks.append("(empty)\n\n")
 
@@ -83,8 +85,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pylistall",
         description=(
-            "Copy directory file contents to clipboard "
-            "with tree and optional git log."
+            "Copy directory file contents to clipboard with tree and optional git log."
         ),
     )
     parser.add_argument(
@@ -194,14 +195,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     omit_patterns = parse_omit_patterns(args.omit)
     selection = SelectionOptions(
         recursive=bool(args.recursive),
-        include=args.include,
+        include=flatten_patterns(args.include),
         omit=omit_patterns,
         max_bytes=args.max_bytes,
     )
     binary_policy = parse_binary_policy(args.binary)
 
-    git_options = GitLogOptions(enabled=args.git_log is not None,
-                                count=args.git_log)
+    git_options = GitLogOptions(enabled=args.git_log is not None, count=args.git_log)
 
     result = _build_output(
         root=root,
@@ -216,8 +216,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("")
 
     copy_to_clipboard(result.text)
-    print(f"Copied to clipboard: {root.resolve()} "
-          f"(files: {result.file_count})")
+    print(f"Copied to clipboard: {root.resolve()} (files: {result.file_count})")
 
     for warning in result.warnings:
         print(f"Warning: {warning}")

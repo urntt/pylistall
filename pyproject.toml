@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,9 +8,19 @@ version = "0.3.0"
 description = "Copy file contents under a directory to clipboard with tree and optional git log."
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{name = "urntt"}]
-dependencies = []
+dependencies = ["pyperclip>=1.8"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.14",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8", "twine>=6"]
 
 [project.scripts]
 pylistall = "pylistall.cli:main"
@@ -25,3 +35,15 @@ where = ["src"]
 Homepage = "https://github.com/urntt/pylistall"
 Repository = "https://github.com/urntt/pylistall"
 Issues = "https://github.com/urntt/pylistall/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "--strict-markers", "-ra"]
+xfail_strict = true
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
