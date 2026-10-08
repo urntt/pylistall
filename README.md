@@ -1,6 +1,7 @@
 # pylistall
 
 [![PyPI version](https://img.shields.io/pypi/v/pylistall.svg)](https://pypi.org/project/pylistall/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pylistall.svg)](https://pypi.org/project/pylistall/)
 [![License](https://img.shields.io/github/license/urntt/pylistall.svg)](https://github.com/urntt/pylistall)
 
 [中文说明](README.zh-CN.md)
