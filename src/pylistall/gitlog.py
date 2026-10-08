@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import codecs
+import io
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from pylistall.traversal import TraversalResult, scan_directory
 
@@ -28,32 +31,60 @@ class GitEntry:
     is_dir: bool
 
 
-def _run_git_log(repo_root: Path, count: int) -> str:
-    """Run git log for a repository root."""
-    cmd: list[str] = [
-        "git",
-        "-C",
-        str(repo_root),
-        "log",
-        "--oneline",
-        "--decorate",
-    ]
+def _run_git_log(
+    repo_root: Path,
+    count: int,
+    check_size: Optional[Callable[[int], None]] = None,
+    chunk_bytes: int = 4096,
+) -> str:
+    """Read logs in chunks and always reap the process after an early abort."""
+    cmd = ["git", "-C", str(repo_root), "log", "--oneline", "--decorate", "--no-color"]
     if count != GIT_LOG_ALL:
         cmd.append(f"-n{count}")
-
+    process = None
     try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        output = result.stdout.strip()
-        return output if output else "[No git log output]"
-    except (OSError, subprocess.CalledProcessError) as exc:
+        # A file avoids deadlock if Git writes substantial stderr while stdout
+        # is being read. Diagnostics are represented by a bounded error marker.
+        with tempfile.TemporaryFile() as errors:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=errors)
+            assert process.stdout is not None
+            decoder = io.IncrementalNewlineDecoder(
+                codecs.getincrementaldecoder("utf-8")(errors="replace"), True
+            )
+            chunks = []
+            size = 0
+            pending_space = 0
+            started = False
+            while True:
+                data = process.stdout.read1(chunk_bytes)
+                text = decoder.decode(data, final=not data)
+                chunks.append(text)
+                # Ignore only outer whitespace, as the baseline Git output did.
+                if not started:
+                    text = text.lstrip()
+                    started = bool(text)
+                content = text.rstrip()
+                if content:
+                    size += pending_space + len(content.encode("utf-8"))
+                    pending_space = len(text[len(content) :].encode("utf-8"))
+                else:
+                    pending_space += len(text.encode("utf-8"))
+                if check_size is not None:
+                    check_size(size)
+                if not data:
+                    break
+            if process.wait() != 0:
+                return f"[Failed to read git log: exit status {process.returncode}]"
+            return "".join(chunks).strip() or "[No git log output]"
+    except OSError as exc:
         return f"[Failed to read git log: {exc}]"
+    finally:
+        if process is not None:
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+            if process.stdout is not None:
+                process.stdout.close()
 
 
 def _sort_key(entry: GitEntry) -> tuple[str, int]:
@@ -80,36 +111,3 @@ def _find_git_entries(
     ]
     entries.sort(key=_sort_key)
     return entries, []
-
-
-def build_git_log_sections(
-    root: Path,
-    recursive: bool,
-    count: Optional[int],
-    follow_links: bool = False,
-    *,
-    snapshot: Optional[TraversalResult] = None,
-) -> tuple[str, list[str]]:
-    """Build git log sections.
-
-    Each section always starts with the absolute '.git' path line.
-    """
-    entries, warnings = _find_git_entries(
-        root, recursive, follow_links, snapshot=snapshot
-    )
-    if not entries:
-        return ("", warnings)
-
-    git_count = GIT_LOG_ALL if count is None else int(count)
-
-    chunks: list[str] = []
-    for idx, entry in enumerate(entries):
-        if idx > 0:
-            chunks.append("\n\n")
-
-        git_abs = entry.git_path.resolve()
-        repo_root = entry.git_path.parent
-        chunks.append(f"{git_abs}\n")
-        chunks.append(f"{_run_git_log(repo_root=repo_root, count=git_count)}")
-
-    return ("".join(chunks), warnings)

@@ -10,11 +10,13 @@ future requirements in the [vision](../VISION.md), and contributor commands in
 
 | Module | Responsibility |
 | --- | --- |
-| `cli.py` | Validate arguments, collect once and assemble `OutputResult` |
+| `cli.py` | Validate arguments, collect once and deliver `OutputResult` |
 | `traversal.py` | Iterative filesystem traversal, link classification, ancestor cycles and diagnostics |
 | `tree.py` | Render the shared entries independently of content filters |
 | `selection.py` | Normalize patterns, select, classify and read files |
 | `gitlog.py` | Find repositories in the shared entries and collect Git logs |
+| `output.py` | Structured model, Markdown and total budget |
+| `destinations.py` | File paths and transactional writes |
 | `util.py` | Platform clipboard transport |
 
 ```text
@@ -23,7 +25,7 @@ arguments -> cli -> traversal: one shared index
                      |-> gitlog (optional): discover .git -> Git -> group
                      |-> selection: filter -> sample -> read -> render
                 cli: root + tree + Git + files
-                     -> optional stdout preview -> clipboard -> status
+                     -> Markdown display / file / optional copy -> stderr status
 ```
 
 Standalone collector calls use the same scanner. Content omissions leave tree
@@ -79,29 +81,45 @@ Git must be on PATH when requested; no Git library is used.
 
 ## Output and clipboard
 
-The absolute root is first, followed by the tree in a ten-backtick fence, optional
-Git groups and relative-path-labelled contents in ten-backtick fences. Empty trees
-use `(empty)`. Output ends with a newline. Fixed fences currently do not escape
-delimiter collisions. See the [example](../README.md#output-format).
+`OutputDocument` holds optional root/tree/Git/file blocks, warnings and skip counts.
+`output.py` owns language identification, path escaping and canonical formatting.
+Fences are at least three backticks and longer than any content run. The root is
+first; tree, Git and files have group headings and paths have subheadings. LF
+normalization and truncation markers are shared; destinations never reread files.
 
-`-p` prints before copying. macOS uses UTF-8 `pbcopy`, Windows UTF-16LE `clip`, and
-Linux UTF-8 `xclip -selection clipboard` or pyperclip. Invalid roots return 2;
-collection errors return 1. Clipboard failures still propagate.
+`MarkdownBuilder` counts canonical UTF-8 bytes. File and Git reads decode chunks,
+check a conservative body lower bound, then exactly check complete dynamic fences.
+On excess, collection aborts; Git is killed, waited on and its pipe closed. Delivery
+only begins after the whole budget passes. Total size is unlimited by default.
+Disabled files avoid sampling/reading; disabled Git avoids subprocesses. Dry-run
+collects exactly and reports size, skips and destinations on stderr without writes.
+
+Default display is Markdown; `-c` additionally copies and `-f` suppresses the body.
+`destinations.py` calculates one local timestamp per invocation, resolves relative
+paths from invocation cwd and excludes the target and symbolic/hard-link aliases.
+New files use exclusive creation and cleanup on failure; overwrites complete a
+same-directory temporary before replacement, preserving originals on failure.
+Output is UTF-8 without BOM and LF. Parents are created after collection/budget
+validation. Directories cannot be overwritten as files. Each destination reports
+completed operations on stderr; any failed destination returns 1.
+
+Only copying needs desktop transport: UTF-8 pbcopy on macOS, UTF-16LE clip on
+Windows, UTF-8 xclip or pyperclip on Linux. Argument/root errors return 2 and budget
+or delivery errors return 1. Closed downstream pipes exit normally. See the
+[migration](../README.md#migration-from-031) for removal of `-p`.
 
 ## Safety boundaries and current limitations
 
-Collection is local. The program does not upload data or execute collected code.
-Copying replaces the user's clipboard; users decide where to paste.
+Collection is local, without uploading data or executing collected code. Copying
+replaces the clipboard; explicit `-w` permits file replacement. Default display
+and export work headlessly. Clipboard tests still use mocks.
 
-- Bare `-o` is optional name-based exclusion, not secret detection. It can exclude
-  examples and public certificates and leaves tree names visible.
-- Links are skipped by default; explicit `-l` permits external targets. Worktree
-  pointer files may reference external Git metadata. Traversal is not an atomic
-  filesystem snapshot or protection against concurrent path replacement.
-- Total output is unlimited. `-m` limits individual files, not trees or Git logs;
-  negative limits are not yet rejected. Large inputs can consume memory.
-- Normal operation, including `-p`, needs a desktop clipboard backend. Mocked
-  tests are not desktop integration checks.
-
-Future changes must update both language versions and account for the shared
-tree, Git and content result.
+- Bare `-o` is name-based omission, not secret detection; it excludes some examples
+  and public certificates while tree names remain visible.
+- `-l` allows external targets; worktree pointers can reference external metadata.
+  Traversal is not an atomic snapshot or protection against concurrent replacement.
+- `-M` limits final Markdown, not the directory index or total memory. Defaults
+  remain unlimited; `-m` applies to individual files only.
+- Git execution has no time limit. Unreadable contents use error markers. Concurrent
+  filesystem changes can alter subsequent commands; temporary writes and replacement
+  depend on local filesystem semantics.

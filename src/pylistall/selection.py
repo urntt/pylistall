@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import codecs
 import fnmatch
+import io
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Callable, Iterable, Iterator, Optional, Sequence
 
 from pylistall.traversal import TraversalResult, scan_directory
 
@@ -259,26 +260,51 @@ def is_probably_binary(path: Path) -> bool:
     return (bad_count / max(1, len(sample))) > 0.30
 
 
-def read_text(path: Path, max_bytes: Optional[int]) -> str:
-    """Read file content as UTF-8 text, replacing undecodable bytes."""
+def read_text(
+    path: Path,
+    max_bytes: Optional[int],
+    check_size: Optional[Callable[[int], None]] = None,
+    chunk_bytes: int = 4096,
+) -> str:
+    """Decode bounded chunks, retaining single-file truncation semantics."""
+    decoder = io.IncrementalNewlineDecoder(
+        codecs.getincrementaldecoder("utf-8")(errors="replace"), translate=True
+    )
+    chunks: list[str] = []
+    size = 0
+    consumed = 0
+    truncated = False
     try:
         with path.open("rb") as handle:
-            if max_bytes is None:
-                data = handle.read()
-            else:
-                data = handle.read(max_bytes + 1)
+            while True:
+                remaining = (
+                    chunk_bytes
+                    if max_bytes is None
+                    else min(chunk_bytes, max_bytes - consumed)
+                )
+                data = handle.read(remaining)
+                if not data:
+                    if max_bytes == 0:
+                        truncated = bool(handle.read(1))
+                    break
+                consumed += len(data)
+                text = decoder.decode(data, final=False)
+                chunks.append(text)
+                size += len(text.encode("utf-8"))
+                if check_size is not None:
+                    check_size(size)
+                if max_bytes is not None and consumed == max_bytes:
+                    truncated = bool(handle.read(1))
+                    break
     except OSError as exc:
         return f"[Failed to read file: {exc}]"
-
-    truncated = False
-    if max_bytes is not None and len(data) > max_bytes:
-        data = data[:max_bytes]
-        truncated = True
-
-    text = data.decode("utf-8", errors="replace")
+    tail = decoder.decode(b"", final=True)
     if truncated:
-        text += "\n\n[...TRUNCATED...]\n"
-    return text
+        tail += "\n\n[...TRUNCATED...]\n"
+    chunks.append(tail)
+    if check_size is not None:
+        check_size(size + len(tail.encode("utf-8")))
+    return "".join(chunks)
 
 
 def _is_included(
@@ -320,24 +346,37 @@ def _binary_allowed_by_b(
     )
 
 
-def select_files_for_content(
+def iter_selected_files(
     root: Path,
     selection: SelectionOptions,
     binary_policy: BinaryPolicy,
     *,
     snapshot: Optional[TraversalResult] = None,
-) -> list[SelectedFile]:
+    excluded: Optional[Path] = None,
+) -> Iterator[SelectedFile]:
     """Select files for content output based on -i/-o/-b and binary rules."""
-    selected: list[SelectedFile] = []
-
     if snapshot is None:
         snapshot = scan_directory(root, selection.recursive, selection.follow_links)
     root = snapshot.root
-    for entry in snapshot.entries:
+    for entry in sorted(
+        snapshot.entries,
+        key=lambda item: (
+            item.relative_path.as_posix().lower(),
+            item.relative_path.as_posix(),
+        ),
+    ):
         if not entry.is_file or entry.skipped is not None:
             continue
         file_path = entry.resolved_path
         assert file_path is not None
+        if excluded is not None:
+            if entry.path == excluded or file_path == excluded.resolve():
+                continue
+            try:
+                if file_path.samefile(excluded):
+                    continue
+            except OSError:
+                pass
         rel_str = entry.relative_path.as_posix()
         filename = entry.path.name
 
@@ -364,38 +403,24 @@ def select_files_for_content(
                     continue
 
         display = rel_str if selection.recursive else filename
-        selected.append(
-            SelectedFile(
-                absolute_path=file_path,
-                relative_path=entry.relative_path,
-                display_name=display,
-            )
+        yield SelectedFile(
+            absolute_path=file_path,
+            relative_path=entry.relative_path,
+            display_name=display,
         )
 
-    selected.sort(key=lambda item: item.display_name.lower())
-    return selected
 
-
-def build_content_sections(
+def select_files_for_content(
     root: Path,
     selection: SelectionOptions,
     binary_policy: BinaryPolicy,
     *,
     snapshot: Optional[TraversalResult] = None,
-) -> tuple[str, int]:
-    """Build file content blocks and return them with file count."""
-    selected = select_files_for_content(
-        root=root, selection=selection, binary_policy=binary_policy, snapshot=snapshot
+    excluded: Optional[Path] = None,
+) -> list[SelectedFile]:
+    """Materialize selection for callers that need the complete candidate list."""
+    return list(
+        iter_selected_files(
+            root, selection, binary_policy, snapshot=snapshot, excluded=excluded
+        )
     )
-    if not selected:
-        return ("", 0)
-
-    chunks: list[str] = []
-    for item in selected:
-        content = read_text(item.absolute_path, max_bytes=selection.max_bytes)
-        chunks.append(f"`{item.display_name}`:\n")
-        chunks.append("``````````\n")
-        chunks.append(f"{content}\n")
-        chunks.append("``````````\n\n")
-
-    return ("".join(chunks).rstrip() + "\n", len(selected))

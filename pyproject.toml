@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pylistall"
 version = "0.3.1"
-description = "Copy file contents under a directory to clipboard with tree and optional git log."
+description = "Display directory context with a tree and Git history, or copy and export Markdown."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
