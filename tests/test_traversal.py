@@ -133,7 +133,7 @@ def test_cli_uses_one_scan_for_tree_content_and_git(tmp_path, write_file, monkey
 
     monkeypatch.setattr(traversal.os, "scandir", counted)
     monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
-    monkeypatch.setattr(gitlog, "_run_git_log", lambda **kwargs: "synthetic log")
+    monkeypatch.setattr(gitlog, "_run_git_log", lambda *args, **kwargs: "synthetic log")
     assert cli.main([str(tmp_path), "-r", "-g", "2"]) == 0
     assert sorted(scans) == sorted([tmp_path, tmp_path / ".git", tmp_path / "src"])
 
@@ -182,3 +182,29 @@ def test_special_files_are_not_opened(tmp_path):
     snapshot = traversal.scan_directory(tmp_path, True)
     assert render_tree(snapshot) == "└── fifo"
     assert names(snapshot) == []
+
+
+def test_output_symlink_target_excluded_before_sampling(
+    tmp_path, link_factory, monkeypatch
+):
+    from pylistall import selection
+
+    target = tmp_path / "result"
+    target.write_text("previous output", encoding="utf-8")
+    link_factory(tmp_path / "alias.py", target)
+    snapshot = traversal.scan_directory(tmp_path, True, True)
+
+    def forbidden(path):
+        pytest.fail("output target was sampled")
+
+    monkeypatch.setattr(selection, "is_probably_binary", forbidden)
+    assert (
+        selection.select_files_for_content(
+            tmp_path,
+            SelectionOptions(True, (), (), None, True),
+            parse_binary_policy(None),
+            snapshot=snapshot,
+            excluded=target,
+        )
+        == []
+    )

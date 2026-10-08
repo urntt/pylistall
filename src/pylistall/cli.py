@@ -3,19 +3,39 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
 
-from pylistall.gitlog import GitLogOptions, build_git_log_sections
+from pylistall import gitlog
+from pylistall.destinations import (
+    resolve_destination,
+    validate_destination,
+    write_output,
+)
+from pylistall.gitlog import GitLogOptions
+from pylistall.output import (
+    ContentBlock,
+    MarkdownBuilder,
+    OutputDocument,
+    OutputTooLarge,
+    block_markdown,
+    empty_group,
+    group_heading,
+    language_for,
+    root_markdown,
+    tree_markdown,
+)
 from pylistall.selection import (
     BinaryPolicy,
     SelectionOptions,
-    build_content_sections,
     flatten_patterns,
+    iter_selected_files,
     parse_binary_policy,
     parse_omit_patterns,
+    read_text,
 )
 from pylistall.traversal import scan_directory
 from pylistall.tree import build_tree_text
@@ -24,11 +44,18 @@ from pylistall.util import copy_to_clipboard
 
 @dataclass(frozen=True)
 class OutputResult:
-    """Represents the final output and metadata."""
+    """One collection, canonical Markdown, and destination-independent metadata."""
 
     text: str
-    file_count: int
-    warnings: tuple[str, ...]
+    document: OutputDocument
+
+    @property
+    def file_count(self) -> int:
+        return len(self.document.files or ())
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self.document.warnings
 
 
 def _build_output(
@@ -36,55 +63,71 @@ def _build_output(
     selection: SelectionOptions,
     binary_policy: BinaryPolicy,
     git_options: GitLogOptions,
+    *,
+    disabled: tuple[str, ...] = (),
+    maximum: Optional[int] = None,
+    excluded: Optional[Path] = None,
 ) -> OutputResult:
-    """Build the final output text and return it along with file count."""
-    chunks: list[str] = []
+    """Collect enabled parts once, checking budgets before any delivery."""
+    root = root.resolve(strict=True)
     snapshot = scan_directory(root, selection.recursive, selection.follow_links)
-
-    # 1) Root + tree (tree is independent from all filters except -r)
-    #    Uses 10 backticks as fence
-    chunks.append(f"{root.resolve()}\n")
-    tree_text = build_tree_text(
-        root=root, recursive=selection.recursive, snapshot=snapshot
-    )
-    if tree_text:
-        chunks.append(f"``````````\n{tree_text}\n``````````\n\n")
-    else:
-        chunks.append("(empty)\n\n")
-
-    warnings: list[str] = list(snapshot.warnings)
-
-    # 2) Git logs (always print absolute .git path before each group)
-    if git_options.enabled:
-        sections, git_warnings = build_git_log_sections(
-            root=root,
-            recursive=selection.recursive,
-            count=git_options.count,
-            snapshot=snapshot,
+    builder = MarkdownBuilder(maximum)
+    root_text = str(root) if "root" not in disabled else None
+    tree_text = None
+    logs = None
+    files = None
+    if root_text is not None:
+        builder.append(root_markdown(root_text))
+    if "tree" not in disabled:
+        tree_text = build_tree_text(root, selection.recursive, snapshot=snapshot)
+        builder.append(tree_markdown(tree_text))
+    chunk_bytes = min(4096, maximum + 1) if maximum is not None else 4096
+    if git_options.enabled and "git" not in disabled:
+        builder.append(group_heading("git"))
+        logs = []
+        entries, _ = gitlog._find_git_entries(
+            root, selection.recursive, snapshot=snapshot
         )
-        warnings.extend(git_warnings)
-        if sections:
-            chunks.append(sections)
-            chunks.append("\n\n")
-        else:
-            chunks.append("[No .git found]\n\n")
-
-    # 3) Content sections
-    content_text, file_count = build_content_sections(
-        root=root,
-        selection=selection,
-        binary_policy=binary_policy,
-        snapshot=snapshot,
+        for entry in entries:
+            title = str(entry.git_path.resolve())
+            text = gitlog._run_git_log(
+                entry.git_path.parent,
+                gitlog.GIT_LOG_ALL if git_options.count is None else git_options.count,
+                check_size=builder.body_checker(title, "text"),
+                chunk_bytes=chunk_bytes,
+            )
+            block = ContentBlock(title, text)
+            builder.append(block_markdown(block))
+            logs.append(block)
+        if not logs:
+            builder.append(empty_group("git"))
+    if "files" not in disabled:
+        builder.append(group_heading("files"))
+        files = []
+        for item in iter_selected_files(
+            root, selection, binary_policy, snapshot=snapshot, excluded=excluded
+        ):
+            language = language_for(item.display_name)
+            text = read_text(
+                item.absolute_path,
+                selection.max_bytes,
+                builder.body_checker(item.display_name, language),
+                chunk_bytes,
+            )
+            block = ContentBlock(item.display_name, text, language)
+            builder.append(block_markdown(block))
+            files.append(block)
+        if not files:
+            builder.append(empty_group("files"))
+    document = OutputDocument(
+        root_text,
+        tree_text,
+        None if logs is None else tuple(logs),
+        None if files is None else tuple(files),
+        snapshot.warnings,
+        sum(entry.skipped is not None for entry in snapshot.entries),
     )
-    if content_text:
-        chunks.append(content_text)
-
-    final_text = "".join(chunks).rstrip() + "\n"
-    return OutputResult(
-        text=final_text,
-        file_count=file_count,
-        warnings=tuple(warnings),
-    )
+    return OutputResult(builder.text(), document)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -92,7 +135,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pylistall",
         description=(
-            "Copy directory file contents to clipboard with tree and optional git log."
+            "Display directory context; optionally copy Markdown or save a file."
         ),
     )
     parser.add_argument(
@@ -179,68 +222,148 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "-p",
-        "--print",
-        dest="print_output",
-        action="store_true",
-        help="Print the output to stdout before 'Copied to clipboard...'.",
+        "-c", "--copy", action="store_true", help="Also copy Markdown to the clipboard."
     )
-
+    parser.add_argument(
+        "-f",
+        "--file",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="DEST",
+        help="Save Markdown to a file instead of displaying the body.",
+    )
+    parser.add_argument(
+        "-w",
+        "--overwrite",
+        action="store_true",
+        help="Allow replacing an output file (requires -f).",
+    )
+    parser.add_argument(
+        "-d",
+        "--disable",
+        action="append",
+        default=[],
+        metavar="PARTS",
+        help="Omit root,tree,git,files (repeatable, comma-separated).",
+    )
+    parser.add_argument(
+        "-D",
+        "--dry-run",
+        action="store_true",
+        help="Collect and show exact summary without copying or writing.",
+    )
+    parser.add_argument(
+        "-M",
+        "--max-output-bytes",
+        type=int,
+        metavar="N",
+        help="Limit the complete Markdown UTF-8 byte size.",
+    )
     return parser
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    """Parse CLI arguments."""
-    return _build_parser().parse_args(argv)
+    """Validate combinations before collecting any data."""
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    args.disable = flatten_patterns(args.disable)
+    if set(args.disable) - {"root", "tree", "git", "files"}:
+        parser.error("--disable accepts only root, tree, git, files")
+    enabled = {"root", "tree", "files"}
+    if args.git_log is not None:
+        enabled.add("git")
+    if not enabled - set(args.disable):
+        parser.error("at least one output part must remain enabled")
+    if args.overwrite and args.file is None:
+        parser.error("--overwrite requires --file")
+    if args.max_output_bytes is not None and args.max_output_bytes <= 0:
+        parser.error("--max-output-bytes must be positive")
+    if args.max_bytes is not None and args.max_bytes < 0:
+        parser.error("--max-bytes must be nonnegative")
+    if args.git_log is not None and args.git_log != -1 and args.git_log <= 0:
+        parser.error("--git-log count must be positive")
+    return args
+
+
+def _display(result: OutputResult) -> None:
+    """Display canonical Markdown until the terminal renderer is installed."""
+    try:
+        sys.stdout.write(result.text)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # Redirecting to a closed downstream pipe is a normal CLI exit.
+        try:
+            sys.stdout.close()
+        except BrokenPipeError:
+            pass
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """CLI entry point."""
+    """Collect once and independently report the outcome of each destination."""
     args = parse_args(argv)
-
     root = Path(args.path).expanduser()
-    if not root.exists():
-        print(f"Error: path does not exist: {root}")
-        return 2
     if not root.is_dir():
-        print(f"Error: path is not a directory: {root}")
+        print(f"Error: path is not a directory: {root}", file=sys.stderr)
         return 2
-
-    omit_patterns = parse_omit_patterns(args.omit)
-    selection = SelectionOptions(
-        recursive=bool(args.recursive),
-        include=flatten_patterns(args.include),
-        omit=omit_patterns,
-        max_bytes=args.max_bytes,
-        follow_links=args.follow_links,
-    )
-    binary_policy = parse_binary_policy(args.binary)
-
-    git_options = GitLogOptions(enabled=args.git_log is not None, count=args.git_log)
-
+    destination = None
     try:
+        if args.file is not None:
+            destination = resolve_destination(args.file, Path.cwd())
+            validate_destination(destination, args.overwrite)
         result = _build_output(
-            root=root,
-            selection=selection,
-            binary_policy=binary_policy,
-            git_options=git_options,
+            root,
+            SelectionOptions(
+                bool(args.recursive),
+                flatten_patterns(args.include),
+                parse_omit_patterns(args.omit),
+                args.max_bytes,
+                args.follow_links,
+            ),
+            parse_binary_policy(args.binary),
+            GitLogOptions(args.git_log is not None, args.git_log),
+            disabled=args.disable,
+            maximum=args.max_output_bytes,
+            excluded=destination,
         )
-    except (OSError, RuntimeError) as exc:
-        print(f"Error: failed to collect {root}: {exc}", file=sys.stderr)
+    except (OSError, RuntimeError, OutputTooLarge) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         return 1
-
-    if args.print_output:
-        # Print full content first, then an empty line, then the copy message.
-        print(result.text, end="")
-        print("")
-
-    copy_to_clipboard(result.text)
-    print(f"Copied to clipboard: {root.resolve()} (files: {result.file_count})")
-
     for warning in result.warnings:
-        print(f"Warning: {warning}")
-
-    return 0
+        print(f"Warning: {warning}", file=sys.stderr)
+    if args.dry_run:
+        destinations = []
+        if destination is not None:
+            destinations.append(f"file: {destination}")
+        else:
+            destinations.append("terminal")
+        if args.copy:
+            destinations.append("clipboard")
+        print(
+            f"Dry run: {len(result.text.encode('utf-8'))} UTF-8 bytes; "
+            f"files: {result.file_count}; skipped entries: {result.document.skipped_count}; "
+            + "; ".join(destinations),
+            file=sys.stderr,
+        )
+        return 0
+    failed = False
+    if destination is not None:
+        try:
+            write_output(destination, result.text, args.overwrite)
+            print(f"Saved: {destination} (files: {result.file_count})", file=sys.stderr)
+        except OSError as exc:
+            failed = True
+            print(f"Error: file output failed: {exc}", file=sys.stderr)
+    else:
+        _display(result)
+    if args.copy:
+        try:
+            copy_to_clipboard(result.text)
+            print(f"Copied to clipboard (files: {result.file_count})", file=sys.stderr)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            failed = True
+            print(f"Error: clipboard copy failed: {exc}", file=sys.stderr)
+    return int(failed)
 
 
 if __name__ == "__main__":

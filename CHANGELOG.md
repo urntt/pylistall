@@ -8,6 +8,11 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+- Change default copying to display; add `-c`, `-f`, `-w`, `-d`, `-D`, `-M`; remove `-p`.
+- Collect one structured result; generate typed, escaped Markdown with dynamic fences.
+- Stream file/Git reads with exact Markdown budgets, dry-run summaries and no partial delivery.
+- Save UTF-8/LF files from invocation cwd, exclude the destination and aliases, reject collisions and preserve originals on failed overwrites.
+
 ### Changed
 
 - Share iterative discovery across the tree, file selection, and Git lookup.

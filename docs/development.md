@@ -17,7 +17,7 @@ pylistall/
 ├── VISION*.md                 product direction
 ├── docs/                      development and architecture, in both languages
 ├── .github/                   CI workflow and bilingual pull request template
-├── src/pylistall/              CLI, shared traversal, tree, selection, Git logs, clipboard
+├── src/pylistall/              CLI, traversal, model/rendering, destinations, selection, Git, clipboard
 ├── tests/                     behavior and regression tests
 ├── scripts/                   unified checks, CI matrix and wheel smoke test
 ├── pyproject.toml             metadata, dependencies, build and check configuration
@@ -62,8 +62,8 @@ uv run --locked pylistall --help
 uv run --locked pylistall . -r -o -i "*.py"
 ```
 
-The second command replaces the clipboard; use a disposable fixture when checking
-collected output. `-p` also requires a clipboard. See
+The second command displays collected output without touching the clipboard.
+Use a disposable fixture for manual checks; only `-c` needs a clipboard. See
 [architecture limitations](architecture.md#safety-boundaries-and-current-limitations)
 before testing against unfamiliar directories.
 
@@ -101,6 +101,9 @@ trees, CLI output and errors, Git grouping, and clipboard backend selection. The
 use temporary directories and mock clipboard programs, pyperclip, and Git log
 retrieval. They do not modify the real clipboard or require a desktop session.
 Backend mocks verify commands and encodings, not actual OS integration.
+Output tests cover exact UTF-8 budgets, disabled collectors, dry-run destinations,
+file collisions, aliases, failure cleanup and preservation of existing files.
+A real disposable Git repository verifies Unicode log transport.
 Release tests also cover rejection of mixed artifacts, inconsistent metadata,
 missing notes, invalid tags, and changed remote hashes without network uploads.
 
