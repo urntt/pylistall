@@ -14,7 +14,7 @@ pylistall 是一个跨平台命令行工具，用于收集指定目录下的文�
 
 ### 结构
 
-- `cli.py` 负责参数与输出组装，`tree.py` 负责真实目录树，`selection.py` 负责内容筛选和读取，`gitlog.py` 负责日志收集，`util.py` 负责剪贴板。维护这些边界，数据流与仓库结构分别见[架构文档](docs/architecture.zh-CN.md)和[开发指南](docs/development.zh-CN.md)。
+- `cli.py` 负责参数与输出组装，`traversal.py` 提供共享遍历，`tree.py` 负责真实目录树，`selection.py` 负责内容筛选和读取，`gitlog.py` 负责日志收集，`util.py` 负责剪贴板。维护这些边界，数据流与仓库结构分别见[架构文档](docs/architecture.zh-CN.md)和[开发指南](docs/development.zh-CN.md)。
 
 ### 平台
 
@@ -34,7 +34,7 @@ pylistall 是一个跨平台命令行工具，用于收集指定目录下的文�
 
 ### 行为
 
-- 用户可观察行为以 [README](README.zh-CN.md) 为说明入口、`tests/` 为回归基线。目录树独立于内容过滤，`-o` 优先于 `-i` 和 `-b`；`-p` 打印后仍复制剪贴板。行为修改必须同步测试及双语文档。
+- 用户可观察行为以 [README](README.zh-CN.md) 为说明入口、`tests/` 为回归基线。目录树独立于内容过滤，`-o` 优先于 `-i` 和 `-b`；链接默认只显示，`-l` 可跟随根外目标，目录展开还需 `-r`；`-p` 打印后仍复制剪贴板。行为修改必须同步测试及双语文档。
 
 ### 依赖
 

@@ -186,6 +186,57 @@ def test_custom_double_star_pattern_keeps_existing_matching(tmp_path, write_file
     ) == [".venv/config.txt"]
 
 
+@pytest.mark.parametrize("prefix", ["", "nested/"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".git",
+        ".git/HEAD",
+        ".env",
+        ".env.example",
+        "public.pem",
+        "id_ed25519",
+        ".aws/credentials",
+        ".streamlit/secrets.toml",
+        ".nox/tool.txt",
+        ".hypothesis/data.txt",
+        ".ipynb_checkpoints/code.txt",
+        ".next/cache.txt",
+        ".svelte-kit/generated.txt",
+        ".coverage",
+        "htmlcov/report.txt",
+        "target/artifact.txt",
+        "desktop.ini",
+        "pylistall-output-example.md",
+    ],
+)
+def test_extended_omissions_cover_root_and_nested(tmp_path, write_file, prefix, name):
+    write_file(prefix + name, "omitted")
+    write_file("main.py", "retained")
+    assert selected_names(tmp_path, recursive=True, omit=parse_omit_patterns([""])) == [
+        "main.py"
+    ]
+
+
+def test_default_omissions_preserve_logs_locks_and_gitignore_semantics(
+    tmp_path, write_file
+):
+    for name in (
+        "app.log",
+        "uv.lock",
+        "package-lock.json",
+        ".gitignore",
+        "ignored.txt",
+    ):
+        write_file(name, "ignored.txt\n")
+    assert selected_names(tmp_path, omit=parse_omit_patterns([""])) == [
+        "app.log",
+        "ignored.txt",
+        "package-lock.json",
+        "uv.lock",
+    ]
+
+
 @pytest.mark.parametrize(
     "content",
     [

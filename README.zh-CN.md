@@ -108,7 +108,7 @@ print("Hello World!")
 注意事项：
 
 * 树状目录结构永远反映文件系统的真实状态。
-* 树状目录结构的行为只会被 `-r` 影响，而不会被 `-i`，`-o`，或 `-b` 影响。
+* `-r` 控制目录展开，`-l` 控制链接跟随；`-i`、`-o`、`-b` 不隐藏树中的名称。
 * 文件夹以 `/` 结尾。
 
 ---
@@ -177,7 +177,8 @@ print("Hello World!")
 
 * 如果在使用 `-o` 时没有提供 `[PATTERN]`，则会使用一个默认忽略集。
   默认忽略集包含：
-  `.git/**`，`**/__pycache__/**`，`**/.pytest_cache/**`，`**/.mypy_cache/**`，`**/.ruff_cache/**`，`**/.tox/**`，`**/.venv/**`，`**/venv/**`，`**/build/**`，`**/dist/**`，`**/*.egg-info/**`，`**/node_modules/**`，`**/.idea/**`，`**/.vscode/**`，`**/.gitignore`，`**/.DS_Store`，`**/Thumbs.db`
+  根层与嵌套 Git 元数据、Python 环境与工具缓存、构建产物、`node_modules`、IDE 设置、
+  `.gitignore`、`.DS_Store`、`Thumbs.db`，以及下文列出的新增类别。
 
   以 `**/` 开头的默认规则也会作用于目标目录根层级。例如，`.venv/config.txt`
   和 `nested/.venv/config.txt` 都会被排除。自定义模式保持现有的 `fnmatch` 匹配行为。
@@ -309,6 +310,24 @@ pylistall -o "test/test_*"
 
 ---
 
+## 跟随链接
+
+```sh
+pylistall . -r -l -o
+```
+
+`-l --follow-links` 允许跟随文件和目录链接，包括根目录之外的目标；目录展开仍需
+`-r`。链接默认标记 `@`，不读取或展开。内容显示逻辑相对路径，排除规则同时检查
+逻辑路径和解析目标。祖先链循环与断链会跳过并警告，非循环的重复别名分别保留。
+显式传入的根目录链接即使没有 `-l` 也会解析。
+
+裸 `-o` 新增根层和嵌套 Git 元数据、Python／测试缓存、前端缓存与覆盖率结果、
+其他生成文件及敏感文件名：`.env`、`.env.*`、`.envrc`、`.pypirc`、`.netrc`、
+`id_rsa`、`id_dsa`、`id_ecdsa`、`id_ed25519`、`*.key`、`*.pem`、`*.p12`、`*.pfx`、
+`.aws/credentials`、`.streamlit/secrets.toml`。业务日志与依赖锁文件保留。
+默认名单也会排除部分样例与公开证书，无法检测任意秘密，不读取 `.gitignore`；
+自定义 `-o PATTERN` 不启用默认名单，内容排除不会隐藏目录树名称。
+
 ## 剪贴板支持
 
 不同平台使用的剪贴板后端：
@@ -317,7 +336,8 @@ pylistall -o "test/test_*"
 * Windows：`clip`
 * Linux：`xclip` 或 `pyperclip` 作为备用方案
 
-正常收集需要桌面剪贴板后端。工具不会自动排除秘密信息，也不会把符号链接限制在目标目录内。
+正常收集需要桌面剪贴板后端。裸 `-o` 使用名称排除而非秘密检测；默认跳过链接，
+`-l` 允许跟随根目录之外的目标。
 分享前请检查选定文件；当前边界见[架构文档](docs/architecture.zh-CN.md#安全边界与当前限制)。
 
 ---

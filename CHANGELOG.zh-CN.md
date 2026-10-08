@@ -6,6 +6,16 @@
 [GitHub Releases](https://github.com/urntt/pylistall/releases) 为准。
 维护者按[发布指南](docs/releasing.zh-CN.md)操作。
 
+## [Unreleased]
+
+### 调整
+
+- 目录树、内容筛选及 Git 查找共用迭代遍历。
+- 链接默认只显示，不读取；`-l / --follow-links` 可跟随根内或根外目标，
+  并按祖先链检测循环。
+- 扩展可选默认排除集，覆盖嵌套 Git 元数据、缓存、生成文件及常见凭据名称；
+  被排除的名称仍保留在目录树中。
+
 ## [0.3.1]
 
 ### 修复

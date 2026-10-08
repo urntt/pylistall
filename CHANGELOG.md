@@ -6,6 +6,16 @@ Changes are grouped by the version prepared for release. Publication status and
 dates are recorded in [GitHub Releases](https://github.com/urntt/pylistall/releases).
 Maintainers follow the [release guide](docs/releasing.md).
 
+## [Unreleased]
+
+### Changed
+
+- Share iterative discovery across the tree, file selection, and Git lookup.
+- Show links without reading them by default; `-l / --follow-links` opts into
+  targets inside or outside the root, with ancestor cycle detection.
+- Expand opt-in default omissions for nested Git metadata, caches, generated
+  output, and common credential filenames. Omitted names remain in the tree.
+
 ## [0.3.1]
 
 ### Fixed

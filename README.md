@@ -108,8 +108,8 @@ print("Hello World!")
 Notes:
 
 * The tree always reflects the real filesystem.
-* Tree behavior is only affected by `-r`, not affected by `-i`, `-o`, or `-b`.
-* Directories end with `/`.
+* `-r` controls expansion and `-l` controls link following; `-i`, `-o`, and `-b` do not hide tree names.
+* Directories end with `/`. Links are marked `@` and skipped by default.
 
 ---
 
@@ -179,7 +179,20 @@ Behavior:
 
 * If `-o` is provided without `[PATTERN]`, a default omit set is enabled.
   The default set includes:
-  `.git/**`, `**/__pycache__/**`, `**/.pytest_cache/**`, `**/.mypy_cache/**`, `**/.ruff_cache/**`, `**/.tox/**`, `**/.venv/**`, `**/venv/**`, `**/build/**`, `**/dist/**`, `**/*.egg-info/**`, `**/node_modules/**`, `**/.idea/**`, `**/.vscode/**`, `**/.gitignore`, `**/.DS_Store`, `**/Thumbs.db`
+  Git metadata at every level, Python environments and caches, build products,
+  `node_modules`, IDE settings, `.gitignore`, `.DS_Store`, and `Thumbs.db`.
+  It also covers `.nox`, `.hypothesis`, `.ipynb_checkpoints`, `__pypackages__`,
+  `.eggs`, `htmlcov`, `.coverage*`, `.next`, `.nuxt`, `.output`, `.svelte-kit`,
+  `.turbo`, `.parcel-cache`, `.vite`, `coverage`, `.nyc_output`, `*.tsbuildinfo`,
+  `.eslintcache`, `.stylelintcache`, `.cache`, `target`, `.gradle`, `.vs`,
+  `*.swp`, `*.swo`, `*~`, `desktop.ini`, and `pylistall-output-*.md`.
+
+  Name-based sensitive omissions cover `.env`, `.env.*`, `.envrc`, `.pypirc`,
+  `.netrc`, `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`, `*.key`, `*.pem`,
+  `*.p12`, `*.pfx`, `.aws/credentials`, and `.streamlit/secrets.toml`.
+  These also exclude some examples and public certificates, cannot detect
+  arbitrary secrets, and do not load `.gitignore`. Business logs and dependency
+  lock files are retained.
 
   Default patterns beginning with `**/` also apply at the target directory root.
   For example, both `.venv/config.txt` and `nested/.venv/config.txt` are omitted.
@@ -313,6 +326,18 @@ pylistall -o "test/test_*"
 
 ---
 
+## Following links
+
+```sh
+pylistall . -r -l -o
+```
+
+`-l --follow-links` permits file and directory targets outside the root. Directory
+expansion still requires `-r`. Contents use logical relative paths; omit rules
+check both logical and resolved paths. Ancestor cycles and broken targets are
+skipped with warnings, while repeated non-cyclic aliases remain separate.
+An explicitly supplied root link is resolved even without `-l`.
+
 ## Clipboard Support
 
 Platform-specific clipboard backends:
@@ -323,8 +348,9 @@ Platform-specific clipboard backends:
 | Windows  | clip              |
 | Linux    | xclip / pyperclip |
 
-Normal collection needs a desktop clipboard backend. The tool does not
-automatically exclude secrets or confine symbolic links to the target directory.
+Normal collection needs a desktop clipboard backend. Bare `-o` uses name-based
+omissions rather than secret detection. Links are skipped unless `-l` permits
+following them, including targets outside the root.
 Review the files you select before sharing; current boundaries are documented in
 [architecture](docs/architecture.md#safety-boundaries-and-current-limitations).
 
