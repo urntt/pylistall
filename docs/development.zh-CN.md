@@ -117,8 +117,9 @@ UTF-8 边界、读取上限、目录树、CLI 输出与错误、Git 分组和剪
 
 1. 准备含深层目录、中文及 emoji 名称、较长路径、空文件和大文件的可丢弃目录。
 2. 运行 `uv run --locked pylistall SAMPLE -r -o -n`，观察扫描转圈、文件计数、路径裁剪，
+   以及高亮排版期间的 `render` 路径／块数，
    确认没有错误百分比、Rich 标记解释或状态覆盖正文。
-3. 将 stdout 重定向为文件，确认 stderr 仍有进度、Markdown 没有 ANSI；
+3. 将 stdout 重定向为文件，确认 stderr 仍有进度、Unicode Markdown 没有 ANSI；
    重定向 stderr 确认进度关闭。分别检查 `-P` 与 `-n` 独立。
 4. 检查 `-D`、文件导出和取消后的清理，保留剪贴板模拟。
 5. 在 less 中检查短输出自动退出、长输出翻页／搜索／`q`，确认进度先清理。
@@ -126,6 +127,14 @@ UTF-8 边界、读取上限、目录树、CLI 输出与错误、Git 分组和剪
 
 PR 分开记录自动检查和人工界面结果。沙箱无法创建链接时在允许的环境重跑；
 不要把 PTY 或模拟输出等同于全部真实终端验收，未验证项目应明确列出。
+
+Windows PowerShell 5.1 管道验收时，在测试会话将 `[Console]::OutputEncoding` 设为
+`[System.Text.UTF8Encoding]::new($false)`，让 Shell 正确解码 CLI 的 UTF-8。
+该版本的 `>` 会重新编码文本；精确验证 UTF-8／无 BOM／LF 字节时使用 `-f`，
+并用 `Get-Content -Encoding UTF8` 读取文件。PowerShell 7.4 及以上对原生命令的文件
+重定向保留 stdout 字节，见 [PowerShell 重定向说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection)。
+Windows PowerShell 可能把重定向的原生 stderr 包装为 `NativeCommandError` 记录；
+dry-run 摘要本身不是失败。命令后立即检查 `$LASTEXITCODE`：成功为 0，取消为 130。
 
 ## 构建与验证发行包
 

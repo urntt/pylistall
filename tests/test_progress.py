@@ -85,6 +85,43 @@ def test_progress_configuration_and_ui_failure_cleanup(monkeypatch):
     assert not configured["redirect_stdout"] and not configured["redirect_stderr"]
 
 
+def test_render_progress_uses_its_own_counts_and_literal_paths(monkeypatch):
+    from rich import progress as rich_progress
+
+    updates = []
+
+    class Renderer:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def add_task(self, *args, **kwargs):
+            return 0
+
+        def remove_task(self, task):
+            pass
+
+        def update(self, task, **kwargs):
+            updates.append(kwargs)
+
+    monkeypatch.setattr(rich_progress, "Progress", Renderer)
+    monkeypatch.setattr(progress.sys, "stderr", Stream(True))
+    monkeypatch.setenv("TERM", "xterm")
+    with progress.CollectionProgress() as feedback:
+        feedback.update("files", total=602, checked=602, collected=601)
+        feedback.update("render", "[red]中文🙂\n\x1b", total=603, rendered=0)
+        feedback.update("render", "binary.bin", rendered=603)
+    assert updates[1]["counts"] == "0/603 blocks rendered"
+    assert updates[1]["completed"] == 0 and updates[1]["total"] == 603
+    assert updates[1]["description"] == "render: [red]中文🙂\\n\\x1b"
+    assert updates[2]["counts"] == "603/603 blocks rendered"
+
+
 @pytest.mark.parametrize("options", [[], ["-f", "unused"], ["-D"], ["-c"]])
 def test_progress_stops_before_delivery_and_cancellation(
     tmp_path, monkeypatch, options, capsys
@@ -134,11 +171,13 @@ def test_no_progress_and_no_pager_are_independent(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "CollectionProgress", configured)
     paging = []
     monkeypatch.setattr(
-        cli, "display", lambda *args, **kw: paging.append(kw["no_pager"])
+        cli,
+        "display",
+        lambda *args, **kw: paging.append((kw["no_pager"], kw["no_progress"])),
     )
     assert cli.main([str(tmp_path), "-P"]) == 0
     assert cli.main([str(tmp_path), "-n"]) == 0
-    assert gates == [True, False] and paging == [False, True]
+    assert gates == [True, False] and paging == [(False, True), (True, False)]
 
 
 def test_write_cancellation_cleans_partial_and_preserves_original(

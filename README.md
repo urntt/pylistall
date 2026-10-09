@@ -71,7 +71,10 @@ If `[path]` is not provided, the current directory (`.`) is used.
 
 By default, the result is displayed without changing the clipboard. Interactive
 terminals use headings, colors and syntax highlighting without Markdown fences
-or line numbers. Pipes and redirection receive Markdown without added ANSI.
+or line numbers. Pipes and redirection receive UTF-8/LF Markdown without added ANSI,
+regardless of Python's locale encoding. A shell may decode or re-encode redirected
+output; use `-f` for a file with guaranteed UTF-8/no BOM/LF, including in Windows
+PowerShell 5.1.
 Status messages and warnings go to stderr.
 
 ---
@@ -442,7 +445,7 @@ always remain Markdown. See [Git's pager defaults](https://git-scm.com/docs/git-
 
 ---
 
-### Disable collection progress
+### Disable progress feedback
 
 **Optional; enabled on interactive stderr unless `TERM=dumb`.**
 
@@ -451,7 +454,9 @@ always remain Markdown. See [Git's pager defaults](https://git-scm.com/docs/git-
 ```
 
 Shows scan, tree and Git operations with a spinner, then checked/candidate and
-successfully collected file counts. No percentage is claimed for unknown totals.
+successfully collected file counts. Terminal formatting has a separate `render`
+stage with the current path and rendered block count, before displaying or paging.
+No percentage is claimed for unknown totals.
 Paths are literal and clipped to terminal width; refresh is at most 10 times per
 second. Output redirection, `-f`, `-c` and `-D` still allow progress when stderr is
 interactive. Redirect stderr or use `-P` to suppress it. This is independent of

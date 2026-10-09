@@ -2,6 +2,9 @@
 
 import builtins
 import io
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -63,9 +66,135 @@ def test_redirected_output_never_imports_rich_or_starts_pager(document, monkeypa
 
     monkeypatch.setattr(viewer, "render_terminal", forbidden)
     monkeypatch.setattr(viewer, "choose_pager", forbidden)
+    monkeypatch.setattr(viewer, "CollectionProgress", forbidden)
     viewer.display(document, render_markdown(document))
     assert stdout.getvalue() == render_markdown(document)
     assert "\x1b" not in stdout.getvalue()
+
+
+@pytest.mark.parametrize("encoding", ["gbk", "ascii"])
+def test_redirected_bytes_ignore_text_encoding_and_newlines(
+    document, monkeypatch, encoding
+):
+    data = io.BytesIO()
+    stdout = io.TextIOWrapper(data, encoding=encoding, newline="\r\n")
+    monkeypatch.setattr(viewer.sys, "stdout", stdout)
+    markdown = render_markdown(document)
+    viewer.display(document, markdown)
+    assert data.getvalue() == markdown.encode("utf-8")
+    stdout.detach()
+
+
+@pytest.mark.parametrize("encoding", ["gbk", "ascii"])
+def test_cli_pipe_matches_file_export_under_non_unicode_stdio(tmp_path, encoding):
+    sample = tmp_path / "sample"
+    sample.mkdir()
+    (sample / "中文🙂.py").write_text('print("中文🙂")\n', encoding="utf-8")
+    target = tmp_path / "output.md"
+    environment = dict(os.environ, PYTHONIOENCODING=encoding, PYTHONUTF8="0")
+    command = [
+        sys.executable,
+        "-c",
+        "from pylistall.cli import main; raise SystemExit(main())",
+        str(sample),
+        "-P",
+    ]
+    piped = subprocess.run(command, capture_output=True, env=environment, timeout=15)
+    exported = subprocess.run(
+        [*command, "-f", str(target)],
+        capture_output=True,
+        env=environment,
+        timeout=15,
+    )
+    assert piped.returncode == exported.returncode == 0, (piped.stderr, exported.stderr)
+    assert piped.stdout == target.read_bytes()
+    assert "中文🙂" in piped.stdout.decode("utf-8")
+    assert b"\x1b" not in piped.stdout and b"\r" not in piped.stdout
+    assert not piped.stderr and not exported.stdout
+
+
+def test_render_feedback_tracks_blocks_without_changing_output(document):
+    document = OutputDocument(
+        document.project_name,
+        document.path,
+        document.tree,
+        (ContentBlock("repo/.git", "commit"),),
+        (*document.files, ContentBlock("binary.bin", None)),
+    )
+    reports = []
+    text = viewer.render_terminal(
+        document,
+        width=100,
+        color=False,
+        report=lambda stage, path, **counts: reports.append((stage, path, counts)),
+    )
+    assert text == viewer.render_terminal(document, width=100, color=False)
+    assert reports[0] == ("render", document.path, {"total": 4, "rendered": 0})
+    assert [counts["rendered"] for _, _, counts in reports if "rendered" in counts] == [
+        0,
+        1,
+        2,
+        3,
+        4,
+    ]
+    assert [path for _, path, counts in reports if not counts] == [
+        "repo/.git",
+        "[red]中文.py",
+        "binary.bin",
+    ]
+
+
+@pytest.mark.parametrize("no_pager,no_progress", [(False, False), (True, True)])
+@pytest.mark.parametrize("failure", [None, KeyboardInterrupt, RuntimeError])
+def test_render_feedback_cleans_before_delivery_or_failure(
+    document, monkeypatch, no_pager, no_progress, failure
+):
+    order = []
+
+    class Feedback:
+        def __init__(self, disabled):
+            assert disabled == no_progress
+
+        def __enter__(self):
+            order.append("start")
+            return self
+
+        def update(self, *args, **kwargs):
+            pass
+
+        def __exit__(self, *args):
+            order.append("stop")
+
+    def render(*args, **kwargs):
+        assert order[-1] == "start" and callable(kwargs["report"])
+        order.append("render")
+        if failure is not None:
+            raise failure()
+        return "rendered"
+
+    def delivered(text, *args):
+        assert order[-1] == "stop" and text == "rendered"
+        order.append("delivered")
+        return True
+
+    monkeypatch.setattr(viewer.sys, "stdout", Terminal())
+    monkeypatch.setattr(viewer.sys, "stdin", Terminal())
+    monkeypatch.setattr(viewer, "CollectionProgress", Feedback)
+    monkeypatch.setattr(viewer, "render_terminal", render)
+    monkeypatch.setattr(
+        viewer, "choose_pager", lambda: viewer.PagerCommand(("less", "-FRX"), "less")
+    )
+    monkeypatch.setattr(viewer, "run_pager", delivered)
+    monkeypatch.setattr(viewer, "_write_stdout", delivered)
+    if failure is not None:
+        with pytest.raises(failure):
+            viewer.display(
+                document, "markdown", no_pager=no_pager, no_progress=no_progress
+            )
+        assert order == ["start", "render", "stop"]
+    else:
+        viewer.display(document, "markdown", no_pager=no_pager, no_progress=no_progress)
+        assert order == ["start", "render", "stop", "delivered"]
 
 
 @pytest.mark.parametrize("stdin_tty,no_pager", [(False, False), (True, True)])
@@ -236,9 +365,6 @@ def test_rich_color_and_no_color(document, monkeypatch):
 
 
 def test_real_closed_downstream_pipe_has_no_traceback():
-    import subprocess
-    import sys
-
     code = 'from pylistall.viewer import display; from pylistall.output import OutputDocument; display(OutputDocument("project",None,None,None,None), "x"*2000000)'
     process = subprocess.Popen(
         [sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE

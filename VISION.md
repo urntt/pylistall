@@ -38,7 +38,7 @@ file content blocks and optional independent Git logs. Name inclusion/omission
 filters tree and Files consistently, with early directory pruning. Binary body
 permission is separate and authorized bytes use Base64. Output parts, raw per-file
 limits, exact Markdown budgets and dry-run remain available. Collection progress
-uses stderr and is independent of terminal paging. The
+and terminal formatting feedback use stderr independently of paging. The
 [architecture document](docs/architecture.md) describes actual rules and limitations.
 
 Tree, content and Git discovery share an iterative scan. Links are displayed by

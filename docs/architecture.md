@@ -18,7 +18,7 @@ future requirements in the [vision](../VISION.md), and contributor commands in
 | `names.py` | Visible control characters, inline code delimiters and project names |
 | `gitlog.py` | Consume private Git entries and stream subprocess output |
 | `output.py` | Structured result, language identifiers, Markdown and exact budget |
-| `progress.py` | Optional isolated Rich collection feedback |
+| `progress.py` | Optional isolated Rich collection and terminal formatting feedback |
 | `destinations.py` | Resolve file destinations and perform transactional writes |
 | `viewer.py` | Literal Rich rendering from the model and pager transport |
 | `util.py` | Platform clipboard transport |
@@ -119,7 +119,10 @@ same collection/accounting, reporting only counts, bytes and destinations.
 
 Rich consumes the model directly, without rereading or parsing Markdown, and
 shares language tags. Missing Rich silently falls back. Redirection is ANSI-free
-Markdown. Paging requires stdin/stdout TTY and honors `-n`/`PAGER`; less uses `-FRX`
+Markdown written to the binary stdout stream as UTF-8/no BOM/LF, independent of
+the Python text wrapper's encoding and newline handling; text-only capture streams
+receive the same Markdown string. Shell decoding/re-encoding is outside this
+transport. Paging requires stdin/stdout TTY and honors `-n`/`PAGER`; less uses `-FRX`
 and UTF-8, more uses plain platform encoding. Startup failure displays directly;
 normal quit and downstream pipe closure return 0.
 
@@ -139,7 +142,12 @@ tree and Git with no invented percentages. Files show checked/candidate and
 collected counts. Literal paths are clipped; refresh is at most 10 Hz and Rich
 stream redirection is disabled. Optional callbacks reuse the index and classification;
 feedback adds no scan, sample or read. UI failures disable feedback independently.
-Progress stops before warnings, summary, display or pager.
+Collection feedback stops before warnings and destinations. Interactive display
+starts a separate `render` stage while Rich builds the terminal text, reporting the
+current path and completed/total blocks (one path/tree introduction plus each Git
+and Files entry, including placeholders). It uses the same gates and refresh limit,
+performs no collection reads and stops before stdout delivery or pager startup,
+including on formatting failure or cancellation. Redirection skips this stage.
 
 - Discovered: enumerated logical children, including omitted nodes, excluding root.
 - Candidates: name/link/identity-filtered regular files before binary checks.

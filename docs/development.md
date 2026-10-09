@@ -137,8 +137,9 @@ Manually check a disposable sample in a real Windows terminal:
 
 1. Create nested directories, Chinese/emoji names, long paths, empty and large files.
 2. Run `uv run --locked pylistall SAMPLE -r -o -n`; inspect spinner stages, file
-   counts and path clipping, with no invented percentage or interpreted Rich markup.
-3. Redirect stdout and verify stderr feedback plus ANSI-free Markdown; redirect
+   counts and path clipping, then `render` paths/block counts during highlighting,
+   with no invented percentage or interpreted Rich markup.
+3. Redirect stdout and verify stderr feedback plus ANSI-free Unicode Markdown; redirect
    stderr to disable feedback. Check `-P` independently of `-n`.
 4. Check dry-run, file export and cancellation cleanup; keep clipboard mocked.
 5. Check less short-output exit, long-output navigation/search/`q`, with feedback
@@ -147,6 +148,16 @@ Manually check a disposable sample in a real Windows terminal:
 PRs distinguish automated checks from manual UI results. Rerun real-link tests in
 an environment that allows them if the sandbox denies creation. PTY or simulated
 output is not complete real-terminal acceptance; list unverified items explicitly.
+
+For Windows PowerShell 5.1 pipes, set `[Console]::OutputEncoding` to
+`[System.Text.UTF8Encoding]::new($false)` in the test session so the shell decodes
+the CLI's UTF-8 correctly. Its `>` operator re-encodes text; use `-f` to verify exact
+UTF-8/no BOM/LF bytes, and read that file with `Get-Content -Encoding UTF8`.
+PowerShell 7.4+ preserves native stdout bytes for file redirection, as documented
+in [PowerShell redirection](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection).
+Windows PowerShell may wrap redirected native stderr in `NativeCommandError`
+records; a dry-run summary alone is not a failure. Check `$LASTEXITCODE` immediately
+after the command: success is 0, cancellation is 130.
 
 ## Build and verify artifacts
 

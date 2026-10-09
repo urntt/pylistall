@@ -1,4 +1,4 @@
-"""Optional collection feedback; failures in the UI never affect collection."""
+"""Optional collection/render feedback; UI failures never affect business logic."""
 
 from __future__ import annotations
 
@@ -19,7 +19,13 @@ class CollectionProgress:
         self.progress = None
         self.task: Optional[int] = None
         self.stage = ""
-        self.counts = {"discovered": 0, "total": 0, "checked": 0, "collected": 0}
+        self.counts = {
+            "discovered": 0,
+            "total": 0,
+            "checked": 0,
+            "collected": 0,
+            "rendered": 0,
+        }
 
     def __enter__(self):
         if not self.enabled:
@@ -68,18 +74,24 @@ class CollectionProgress:
                     self.progress.remove_task(self.task)
                 self.stage = stage
                 self.task = self.progress.add_task("", total=None, counts="")
-            file_stage = stage == "files"
-            total = self.counts["total"] if file_stage else None
-            counter = (
-                f"{self.counts['checked']}/{total} checked; "
-                f"{self.counts['collected']} collected"
-                if file_stage
-                else f"{self.counts['discovered']} discovered"
-            )
+            total = None
+            completed = 0
+            if stage == "files":
+                total = self.counts["total"]
+                completed = self.counts["checked"]
+                counter = (
+                    f"{completed}/{total} checked; {self.counts['collected']} collected"
+                )
+            elif stage == "render":
+                total = self.counts["total"]
+                completed = self.counts["rendered"]
+                counter = f"{completed}/{total} blocks rendered"
+            else:
+                counter = f"{self.counts['discovered']} discovered"
             self.progress.update(
                 self.task,
                 total=total,
-                completed=self.counts["checked"] if file_stage else 0,
+                completed=completed,
                 description=f"{stage}: {visible_name(path)}",
                 counts=counter,
             )
