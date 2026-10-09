@@ -335,7 +335,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "-n", "--no-pager", action="store_true", help="Disable interactive paging."
     )
     parser.add_argument(
-        "-P", "--no-progress", action="store_true", help="Disable collection progress."
+        "-P", "--no-progress", action="store_true", help="Disable progress feedback."
     )
     return parser
 
@@ -424,7 +424,12 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
             failed = True
             print(f"Error: file output failed: {exc}", file=sys.stderr)
     else:
-        display(result.document, result.text, no_pager=args.no_pager)
+        display(
+            result.document,
+            result.text,
+            no_pager=args.no_pager,
+            no_progress=args.no_progress,
+        )
     if args.copy:
         try:
             copy_to_clipboard(result.text)

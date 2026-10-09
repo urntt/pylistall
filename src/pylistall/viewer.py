@@ -12,10 +12,11 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from pylistall.names import visible_name
 from pylistall.output import BINARY_PLACEHOLDER, GROUPS, TRUNCATED, OutputDocument
+from pylistall.progress import CollectionProgress
 
 # POSIX SIGPIPE is returned either as -13 or as the shell status 128 + 13.
 NORMAL_PAGER_EXIT_CODES = {0, -13, 141}
@@ -28,7 +29,11 @@ class PagerCommand:
 
 
 def render_terminal(
-    document: OutputDocument, *, width: int, color: bool
+    document: OutputDocument,
+    *,
+    width: int,
+    color: bool,
+    report: Optional[Callable[..., None]] = None,
 ) -> Optional[str]:
     """Import Rich lazily; missing Rich or transitive imports silently fall back."""
     try:
@@ -36,6 +41,11 @@ def render_terminal(
         from rich.syntax import Syntax
         from rich.text import Text
 
+        total = 1 + len(document.git or ()) + len(document.files or ())
+        rendered = 0
+        path = document.path or document.project_name
+        if report is not None:
+            report("render", path, total=total, rendered=rendered)
         output = io.StringIO()
         console = Console(
             file=output,
@@ -53,6 +63,9 @@ def render_terminal(
         if document.tree is not None:
             console.print(Text(document.tree or "(empty)"))
         console.print()
+        rendered += 1
+        if report is not None:
+            report("render", path, rendered=rendered)
         for part, blocks in [("git", document.git), ("files", document.files)]:
             if blocks is None:
                 continue
@@ -60,26 +73,30 @@ def render_terminal(
             if not blocks:
                 console.print(Text(GROUPS[part][1]))
             for block in blocks:
+                if report is not None:
+                    report("render", block.title)
                 console.print(Text(visible_name(block.title), style="bold cyan"))
                 if block.text is None:
                     console.print(Text(BINARY_PLACEHOLDER))
-                    console.print()
-                    continue
-                if block.encoding == "Base64":
-                    console.print(Text("Encoding: Base64"))
-                console.print(
-                    Syntax(
-                        block.text,
-                        block.language,
-                        line_numbers=False,
-                        word_wrap=True,
-                        background_color="default",
-                        theme="ansi_dark",
+                else:
+                    if block.encoding == "Base64":
+                        console.print(Text("Encoding: Base64"))
+                    console.print(
+                        Syntax(
+                            block.text,
+                            block.language,
+                            line_numbers=False,
+                            word_wrap=True,
+                            background_color="default",
+                            theme="ansi_dark",
+                        )
                     )
-                )
-                if block.encoding == "Base64" and block.truncated:
-                    console.print(Text(TRUNCATED))
+                    if block.encoding == "Base64" and block.truncated:
+                        console.print(Text(TRUNCATED))
                 console.print()
+                rendered += 1
+                if report is not None:
+                    report("render", block.title, rendered=rendered)
         return output.getvalue()
     except ImportError:
         return None
@@ -170,8 +187,17 @@ def run_pager(text: str, command: PagerCommand) -> bool:
 
 def _write_stdout(text: str) -> None:
     try:
-        sys.stdout.write(text)
-        sys.stdout.flush()
+        stream = sys.stdout
+        buffer = getattr(stream, "buffer", None)
+        if not getattr(stream, "isatty", lambda: False)() and buffer is not None:
+            # Pipes receive canonical UTF-8/LF, independent of locale, Python
+            # stdio settings and the text wrapper's Windows newline translation.
+            stream.flush()
+            buffer.write(text.encode("utf-8"))
+            buffer.flush()
+        else:
+            stream.write(text)
+            stream.flush()
     except OSError as exc:
         if not isinstance(exc, BrokenPipeError) and not (
             sys.platform == "win32"
@@ -191,7 +217,13 @@ def _write_stdout(text: str) -> None:
                 pass
 
 
-def display(document: OutputDocument, markdown: str, *, no_pager: bool = False) -> None:
+def display(
+    document: OutputDocument,
+    markdown: str,
+    *,
+    no_pager: bool = False,
+    no_progress: bool = False,
+) -> None:
     """Redirected output stays canonical Markdown and never imports Rich."""
     if not getattr(sys.stdout, "isatty", lambda: False)():
         _write_stdout(markdown)
@@ -199,9 +231,13 @@ def display(document: OutputDocument, markdown: str, *, no_pager: bool = False) 
     interactive = getattr(sys.stdin, "isatty", lambda: False)()
     pager = choose_pager() if interactive and not no_pager else None
     width = shutil.get_terminal_size(fallback=(88, 24)).columns
-    pretty = render_terminal(
-        document, width=width, color=pager is None or pager.kind == "less"
-    )
+    with CollectionProgress(no_progress) as progress:
+        pretty = render_terminal(
+            document,
+            width=width,
+            color=pager is None or pager.kind == "less",
+            report=progress.update,
+        )
     text = markdown if pretty is None else pretty
     if pager is not None and run_pager(text, pager):
         return

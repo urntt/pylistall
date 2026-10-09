@@ -22,6 +22,13 @@ Maintainers follow the [release guide](docs/releasing.md).
 - Add `-P --no-progress`, stderr collection stages and accurate file counters,
   without changing paging. Clean cancellation returns 130.
 
+### Fixed
+
+- Write redirected Markdown as UTF-8/LF even with GBK or ASCII Python stdio,
+  preventing Unicode/emoji crashes and preserving bytes before shell processing.
+- Show terminal formatting progress during syntax highlighting instead of leaving
+  a blank wait after collection; clear it before display/paging and honor `-P`.
+
 ### Migration from 1.0.0
 
 - Replace `-d root` with `-d path`; old `root` is an argument error. Disabling all
