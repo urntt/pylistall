@@ -10,123 +10,156 @@ future requirements in the [vision](../VISION.md), and contributor commands in
 
 | Module | Responsibility |
 | --- | --- |
-| `cli.py` | Validate arguments, collect once and deliver `OutputResult` |
-| `traversal.py` | Iterative filesystem traversal, link classification, ancestor cycles and diagnostics |
-| `tree.py` | Render the shared entries independently of content filters |
-| `selection.py` | Normalize patterns, select, classify and read files |
-| `gitlog.py` | Find repositories in the shared entries and collect Git logs |
-| `output.py` | Structured model, Markdown and total budget |
-| `destinations.py` | File paths and transactional writes |
-| `viewer.py` | Literal Rich terminal rendering and pager transport |
+| `cli.py` | Validate arguments, orchestrate one collection and independent destinations |
+| `patterns.py` | Default omissions, pattern normalization, name and target subtree matching |
+| `traversal.py` | Iterative discovery, early pruning, private Git markers, link cycles and diagnostics |
+| `tree.py` | Name-filtered tree and connecting ancestors, without content reads |
+| `selection.py` | Metadata candidates, one binary classification, structured chunked reads |
+| `names.py` | Visible control characters, inline code delimiters and project names |
+| `gitlog.py` | Consume private Git entries and stream subprocess output |
+| `output.py` | Structured result, language identifiers, Markdown and exact budget |
+| `progress.py` | Optional isolated Rich collection feedback |
+| `destinations.py` | Resolve file destinations and perform transactional writes |
+| `viewer.py` | Literal Rich rendering from the model and pager transport |
 | `util.py` | Platform clipboard transport |
 
 ```text
-arguments -> cli -> traversal: one shared index
-                     |-> tree: sort and render
-                     |-> gitlog (optional): discover .git -> Git -> group
-                     |-> selection: filter -> sample -> read -> render
-                cli: root + tree + Git + files
-                     -> Markdown display / file / optional copy -> stderr status
+arguments -> shared patterns -> one traversal (omit pruning)
+                                  |-> tree name view (include + ancestors)
+                                  |-> private Git markers -> Git chunks
+                                  |-> metadata candidates -> classification -> read chunks
+             optional callbacks -> progress on stderr
+             cli -> project + path/tree + Git + Files -> model / Markdown budget
+             stop progress -> warnings -> summary or display/file/copy
 ```
 
-Standalone collector calls use the same scanner. Content omissions leave tree
-names visible and do not filter Git discovery. Results are assembled in memory.
+Results remain in memory. Standalone collectors use the same scanner. Title-only
+and title/path-only documents validate the root but do not enumerate directories.
 
-## Directory tree
+## Discovery, filtering and links
 
-An explicit stack scans each expanded logical directory once. Directories precede
-files, sorted by case-insensitive name with a case-sensitive tie breaker. Tree
-rendering uses another stack. `-r` controls expansion; content filters do not hide
-names. Links are marked `@` and skipped by default, without inspecting targets.
-Only symlink and junction reparse tags are links, not every Windows reparse point.
+The explicit resolved root is exempt from include/omit matching. Children are
+matched by name and `/`-separated logical relative path using platform `fnmatch`.
+Repeated/comma-separated rules are trimmed and deduplicated. Only bare `-o` enables
+defaults; mixing bare and custom omissions takes the union. Default `**/` rules
+also derive root variants; custom rules do not. `*.py` matches names at every
+level; `src/*.py` can match deeper paths. This is not Git ignore syntax.
 
-`-l` follows file and directory links, including external targets; directories
-still need `-r`. Directory identities are compared against the current ancestor
-chain, stopping cycles while preserving separate non-cyclic aliases. The explicit
-root is resolved even without `-l`. Broken followed links and inaccessible nested
-entries remain visible with warnings. Root enumeration failures are fatal.
+Logical omission precedes target checks. A directory's name, relative path or
+relative path with trailing `/` can prune it. `src/**` and `src/` prune `src`,
+while `src/*.py` does not. Omitted nodes count as discovered; unvisited descendants
+do not. `.git` has no permanent hiding rule when omissions are absent.
 
-## Content selection and reading
+Include filters file leaves and retains their connecting directories; it neither
+prunes scanning nor grants binary permission. With no include rules, all unomitted
+structure remains. Tree order is directories first, case-insensitive name with a
+case-sensitive tie breaker; Files order uses logical relative paths in the same
+case ordering. The tree does not depend on readability or binary expansion.
 
-Only regular files from the shared index are candidates; special files are never
-opened. `fnmatch` checks filenames and logical relative paths with `/` separators.
-Repeated and comma-separated patterns are trimmed; empty items are removed.
-Platform case-normalization follows `fnmatch`, not Git ignore syntax.
+Links are marked `@` and not inspected beyond link metadata by default. Junctions
+are recognized without treating every Windows reparse point as a link. Unfollowed,
+broken or uninspectable entries use logical names for tree inclusion. `-l` follows
+inside/outside targets; directory expansion still needs `-r`. Ancestor directory
+identities cut cycles, while non-cyclic aliases remain distinct logical entries.
+Followed targets and omitted directory ancestors are checked against root-relative
+paths (absolute on cross-drive targets). This prevents file aliases into omitted
+subtrees. An explicitly supplied root link is resolved without `-l`.
 
-Include patterns restrict candidates. Omit patterns take precedence over include
-and binary policies, checking both logical paths and resolved target names/paths.
-Bare `-o` enables defaults at the root and nested levels; custom patterns keep
-ordinary `fnmatch` behavior and do not enable defaults. The [README](../README.md)
-describes cache, generated-file and sensitive-name categories. `.gitignore` is not
-loaded. Business logs and dependency locks remain eligible.
+## Content and encoding
 
-Binary detection checks known extensions, then a bounded sample and lookahead.
-NUL implies binary. Incremental strict UTF-8 decoding tolerates a character split
-at the sampling boundary but validates EOF. A non-text-byte ratio is the fallback;
-an unreadable sample is binary. Explicit include can force binary inclusion;
-otherwise `-b` must allow it. This heuristic does not validate an entire file.
+Candidates are ordinary readable-target files after name filtering and output
+identity exclusion, before binary classification. Output targets and symbolic or
+hard-link aliases are excluded only from contents, so existing names can remain
+in the tree. Files disabled means no sampling or reading.
 
-Selected files are sorted by logical display path and decoded as UTF-8 with
-replacement. A per-file byte limit uses lookahead and `[...TRUNCATED...]`; errors
-become `[Failed to read file: ...]` blocks. Binary inclusion does not extract or
-interpret archives, images or documents.
+The extension/NUL/incremental UTF-8/byte-ratio heuristic is preserved. Text expands
+normally. Binary expansion needs bare `-b` or a matching binary permission rule;
+`-i` cannot grant permission and `-b` cannot add candidates. Unexpanded binaries
+retain their heading and a placeholder. Structured blocks distinguish `None`
+(unexpanded) from `""` (successfully read empty), encoding, truncation and errors.
+
+The single chunked reader returns an explicit read result. Text uses UTF-8
+replacement decoding, LF normalization and the existing in-body truncation marker.
+Binary uses standard Base64 with carry across three-byte groups, padding and no
+inserted line breaks. `-m` limits original bytes before encoding; the resulting
+prefix is decodable and the truncation marker is outside its fence. Failed reads
+are visible error blocks, never encoded as binary data. No extraction, decompression
+or file format interpretation is performed.
 
 ## Git logs
 
-Shared entries identify `.git` directories and ordinary worktree pointer files.
-Linked `.git` entries require `-l`. Without `-r`, discovery is root-only. Groups
-are sorted by absolute path and run `git -C <parent> log --oneline --decorate`,
-optionally with a count. Nested traversal failures retain previously found repos.
-Missing Git entries, empty logs and subprocess failures use explicit markers.
-Git must be on PATH when requested; no Git library is used.
+The same scan privately records `.git` directories and ordinary worktree pointers
+in visited, unpruned directories. Explicit Git collection can inspect omitted
+`.git` metadata without displaying or expanding it. Entire omitted parent subtrees
+are not searched. Include and binary permission do not filter Git discovery.
+Non-recursive collection checks only the root; recursion allows nested repositories.
+Linked markers retain the link policy. Groups sort by resolved absolute `.git`
+path and run `git -C <parent> log --oneline --decorate --no-color`, with optional
+count. Absent repositories, empty logs and failures retain explicit markers.
+No `-g` or disabled Git means no Git subprocess.
 
 ## Output and clipboard
 
-`OutputDocument` holds optional root/tree/Git/file blocks, warnings and skip counts.
-`output.py` owns language identification, path escaping and canonical formatting.
-Fences are at least three backticks and longer than any content run. The root is
-first; tree, Git and files have group headings and paths have subheadings. LF
-normalization and truncation markers are shared; destinations never reread files.
+`OutputDocument` always has `project_name`; `path/tree/git/files` are optional.
+All parts may be disabled. `root` is rejected as a disable name. Project names are
+resolved basenames; filesystem roots use `/`, a Windows drive anchor, or UNC share
+name. Markdown uses a dynamic inline code title, one combined `bash` path/tree
+block, optional `## Git log`, then `## Files`. Enabled empty trees use `(empty)`;
+Files always has a heading when enabled, and no candidates use `[No files selected]`.
+Git/file subheadings use inline code. Normal characters are literal; control
+characters have visible escapes. Delimiters grow beyond backtick runs and use
+padding when needed. Body fences are at least three backticks and avoid collisions.
+Base64 blocks have an encoding label. Sections use consistent blank lines and LF.
 
-`MarkdownBuilder` counts canonical UTF-8 bytes. File and Git reads decode chunks,
-check a conservative body lower bound, then exactly check complete dynamic fences.
-On excess, collection aborts; Git is killed, waited on and its pipe closed. Delivery
-only begins after the whole budget passes. Total size is unlimited by default.
-Disabled files avoid sampling/reading; disabled Git avoids subprocesses. Dry-run
-collects exactly and reports size, skips and destinations on stderr without writes.
+`MarkdownBuilder` counts final UTF-8 bytes, including titles, labels, dynamic fences
+and truncation. File/Base64/Git chunks check conservative lower bounds, followed
+by exact complete block checks. Excess aborts later processing, closes files and
+kills/waits/closes Git. No destination receives a partial body. Dry-run uses the
+same collection/accounting, reporting only counts, bytes and destinations.
 
-Default display uses Rich on a TTY and Markdown on redirection; `-c` additionally
-copies Markdown and `-f` suppresses the body. `viewer.py` consumes the same model
-and language tags, lazily imports Rich and silently falls back on ImportError.
-Text/Syntax render literal data, with no line numbers or Markdown fences.
-Paging requires both streams to be terminals and honors `-n` and `PAGER`.
-Less defaults to `-FRX` and UTF-8; system more uses plain platform-encoded text.
-Pager startup failures display directly; normal quits and closed pipes are harmless.
-`destinations.py` calculates one local timestamp per invocation, resolves relative
-paths from invocation cwd and excludes the target and symbolic/hard-link aliases.
-New files use exclusive creation and cleanup on failure; overwrites complete a
-same-directory temporary before replacement, preserving originals on failure.
-Output is UTF-8 without BOM and LF. Parents are created after collection/budget
-validation. Directories cannot be overwritten as files. Each destination reports
-completed operations on stderr; any failed destination returns 1.
+Rich consumes the model directly, without rereading or parsing Markdown, and
+shares language tags. Missing Rich silently falls back. Redirection is ANSI-free
+Markdown. Paging requires stdin/stdout TTY and honors `-n`/`PAGER`; less uses `-FRX`
+and UTF-8, more uses plain platform encoding. Startup failure displays directly;
+normal quit and downstream pipe closure return 0.
 
-Only copying needs desktop transport: UTF-8 pbcopy on macOS, UTF-16LE clip on
-Windows, UTF-8 xclip or pyperclip on Linux. Argument/root errors return 2 and budget
-or delivery errors return 1. Closed downstream pipes exit normally. See the
-[migration notes](../CHANGELOG.md#migration-from-031) for removal of `-p`.
+File destinations use invocation cwd and one local timestamp, support `~`, preserve
+custom names and reject collisions without `-w`. Collection/budget passes before
+creating parents or writing UTF-8/no BOM/LF. Exclusive creation cleans failures;
+overwrites finish a same-directory temporary file before replacing the original.
+A failing destination returns 1 and reports already completed operations without
+rolling them back. Only `-c` uses clipboard: UTF-8 pbcopy on macOS, UTF-16LE clip
+on Windows, UTF-8 xclip or pyperclip on Linux.
+
+## Progress and cancellation
+
+Feedback is enabled only on stderr TTY, non-dumb TERM and without `-P`; stdout
+redirection or `-f/-c/-D` does not disable it. Lazy Rich spinner stages cover scan,
+tree and Git with no invented percentages. Files show checked/candidate and
+collected counts. Literal paths are clipped; refresh is at most 10 Hz and Rich
+stream redirection is disabled. Optional callbacks reuse the index and classification;
+feedback adds no scan, sample or read. UI failures disable feedback independently.
+Progress stops before warnings, summary, display or pager.
+
+- Discovered: enumerated logical children, including omitted nodes, excluding root.
+- Candidates: name/link/identity-filtered regular files before binary checks.
+- Checked: fully processed candidates including placeholders and failures.
+- Collected: successful bodies, including empty files and bounded prefixes.
+
+Aliases count separately. Summary `files` means Files entries, not successful reads;
+`collected` reports the latter. Argument/root errors return 2; budget/destination
+failures 1; Ctrl+C 130 without traceback. Cancellation cleans progress, readers,
+Git and incomplete writes, preserving existing files. Ordinary content failures
+remain error blocks rather than global failures.
 
 ## Safety boundaries and current limitations
 
-Collection is local, without uploading data or executing collected code. Copying
-replaces the clipboard; explicit `-w` permits file replacement. Default display
-and export work headlessly. Clipboard tests still use mocks.
-
-- Bare `-o` is name-based omission, not secret detection; it excludes some examples
-  and public certificates while tree names remain visible.
-- `-l` allows external targets; worktree pointers can reference external metadata.
-  Traversal is not an atomic snapshot or protection against concurrent replacement.
-- `-M` limits final Markdown, not the directory index or total memory. Defaults
-  remain unlimited; `-m` applies to individual files only.
-- Git execution has no time limit. Unreadable contents use error markers. Concurrent
-  filesystem changes can alter subsequent commands; temporary writes and replacement
-  depend on local filesystem semantics.
+Collection stays local, without uploads or executing collected code. Explicit copy
+replaces the clipboard; `-w` permits replacement. Name-based defaults are not secret
+detection, exclude some examples/public certificates, and never load `.gitignore`.
+Following permits external targets and worktree pointers may reference external
+metadata. Traversal is not an atomic snapshot or defense against concurrent path
+replacement. Base64 expands size and does not compress or interpret a file.
+`-M` limits Markdown rather than total memory or index size; defaults are unlimited.
+Git has no runtime timeout. Writes depend on local filesystem semantics. Real
+terminal and clipboard integration cannot be inferred from simulated tests.

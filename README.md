@@ -24,10 +24,11 @@ debugging, documentation, or code review.
 * Copy Markdown to the clipboard or save it to a single file (optional)
 * Tree-style directory structure and absolute root path
 * Recursive traversal of subdirectories (optional, disabled by default)
-* Include or omit files using glob patterns (optional, includes non-binary files by default)
-* Include binary files and Git logs (optional, disabled by default)
+* Include or omit files using glob patterns (optional, filters both the tree and Files)
+* Expand binaries as Base64 and include Git logs (optional, disabled by default)
 * Choose output parts, preview collection, and limit total output size
 * Terminal headings, colors, code highlighting, and interactive paging
+* Collection progress and current operations on interactive stderr
 * Cross-platform support: macOS, Windows, and Linux
 
 ---
@@ -87,11 +88,10 @@ pylistall . -r -o -c
 Example clipboard text (file export and redirection use the same Markdown):
 
 ````markdown
+# `project`
+
+```bash
 /Users/example/project
-
-## Directory tree
-
-```text
 ├── src/
 │   └── main.py
 └── README.txt
@@ -99,13 +99,13 @@ Example clipboard text (file export and redirection use the same Markdown):
 
 ## Files
 
-### README\.txt
+### `README.txt`
 
 ```text
 Example project.
 ```
 
-### src/main\.py
+### `src/main.py`
 
 ```python
 print("Hello World!")
@@ -114,11 +114,14 @@ print("Hello World!")
 
 Notes:
 
-* The root is first, followed by the tree, optional Git groups, and file contents.
-* The tree reflects the filesystem; content filters do not hide tree names.
+* The project title is always first; path and tree share one `bash` block,
+  followed by optional Git groups and Files.
+* `-i` filters file names in the tree and Files, keeping connecting directories.
+  `-o` removes matching names and prunes completely omitted directories.
 * `-r` controls directory expansion and `-l` controls link following.
 * Directories end with `/`; links are marked `@` and skipped by default.
-* Markdown paths are escaped literally. Known file types have language tags;
+* Headings use inline code with dynamic backticks; control characters are shown
+  as visible escapes. Known file types have language tags;
   unknown types use `text`. Fences grow to avoid backtick collisions.
 * Content ordering and `[...TRUNCATED...]` markers remain visible.
 
@@ -220,15 +223,16 @@ pylistall -r -o -f context.md -w
 -d, --disable PARTS
 ```
 
-Omit `root`, `tree`, `git`, or `files` from every destination. Repeat the option or
-use comma-separated values. At least one active output part must remain enabled.
+Omit `path`, `tree`, `git`, or `files` from every destination. Repeat the option or
+use comma-separated values. The project title cannot be disabled; all four parts
+may be disabled to output only that title. `root` is no longer accepted.
 
 Disabling `files` avoids sampling and reading file contents; disabling `git`
 avoids Git queries. Copying, saving and display use the same enabled parts.
 
 ```bash
 pylistall -r -g 3 -d files
-pylistall -d root,tree -d git -c
+pylistall -d path,tree -d git -c
 ```
 
 ---
@@ -242,13 +246,14 @@ pylistall -d root,tree -d git -c
 ```
 
 Include only files matching glob patterns. Repeat the option or use comma-separated
-patterns; surrounding whitespace and empty entries are ignored. Matching uses
+patterns; surrounding whitespace, empty entries and duplicates are removed. Matching uses
 `fnmatch` against the filename and logical relative path.
 
 When `-i` is used:
 
-* Only matching files are included in content output.
-* Matching binary files can be included even without `-b`.
+* Only matching file names remain in the tree and Files, along with their ancestors.
+* Parent directories need not match; `-i` does not prune the scan.
+* Matching binary names remain visible but require `-b` to expand their contents.
 * Matching omit rules still take precedence.
 
 ---
@@ -261,13 +266,13 @@ When `-i` is used:
 -o, --omit [PATTERN]
 ```
 
-Exclude contents matching glob patterns. Repeated and comma-separated values are
-trimmed; empty entries are ignored. Omissions take precedence over `-i` and `-b`,
+Exclude matching names from the tree and Files. Entire omitted directories are
+not scanned. Repeated and comma-separated values are trimmed and deduplicated. Omissions take precedence over `-i` and `-b`,
 checking both logical and resolved paths when links are followed.
 
 Bare `-o` enables the default set at the root and nested levels:
 
-* Git metadata, Python environments/caches, `build`, `dist`, `*.egg-info`,
+* Git metadata, Python environments/caches (including `.venv`), `build`, `dist`, `*.egg-info`,
   `node_modules`, `.idea`, `.vscode`, `.gitignore`, `.DS_Store`, `Thumbs.db`.
 * Python/testing: `.nox`, `.hypothesis`, `.ipynb_checkpoints`, `__pypackages__`,
   `.eggs`, `htmlcov`, `.coverage`, `.coverage.*`.
@@ -281,10 +286,16 @@ Bare `-o` enables the default set at the root and nested levels:
 
 The list also excludes some examples and public certificates. It cannot detect
 arbitrary secrets and does not load `.gitignore`. Business logs and dependency
-locks are retained. Excluding contents leaves names visible in the tree.
+locks are retained. The explicitly selected root itself is exempt from filtering.
+Directory rules match their name, relative path, or relative path ending in `/`:
+`src`, `src/` and `src/**` prune `src`; `src/*.py` removes matching files without
+pruning `src`. Include cannot restore an omitted subtree.
 
 Default patterns beginning with `**/` also apply at the root. Custom patterns keep
-ordinary `fnmatch` behavior and do not automatically enable defaults. To combine:
+ordinary `fnmatch` behavior and do not automatically enable defaults. `*.py` matches file names at every level;
+`src/*.py` can also match deeper paths because `fnmatch` treats `/` as an ordinary
+character. Custom `**/.venv/**` does not match root `.venv` automatically.
+Platform case handling is preserved. To combine:
 
 ```bash
 pylistall -o -o "README.md,test_cases/*"
@@ -300,25 +311,24 @@ pylistall -o -o "README.md,test_cases/*"
 -b, --binary [PATTERN]
 ```
 
-Controls binary inclusion without affecting text files. Included bytes are decoded
-as UTF-8 with replacement; archives, images and documents are not converted or extracted.
+Controls expansion of already selected binary candidates, without adding file
+names or changing the tree. `-o` removes names first, then `-i` selects names, and
+`-b` grants binary content permission. Text files do not need `-b`.
 
-Precedence rules:
+* Not provided → retain a path heading and a binary placeholder, without a body.
+* Bare `-b` → expand all candidate binaries.
+* `-b PATTERN` → expand only binary candidates matching filename or logical path.
 
-1. `-o` always omits matching files, including binaries.
-2. `-i` can force-include specific binaries.
-3. `-b` controls only remaining binaries.
-
-Inclusion rules:
-
-* Not provided → binaries excluded, unless forced by `-i`.
-* Bare `-b` → include all binaries.
-* `-b PATTERN` → include matching binaries only.
+Authorized bytes use padded Base64 without inserted line breaks, labelled
+`Encoding: Base64` in a `text` block. Base64 is neither compression nor file
+interpretation. With `-m`, encode the raw prefix; its encoding remains decodable.
+Binary `[...TRUNCATED...]` appears outside the code block, and only the prefix
+can be restored. Read failures remain visible errors, never encoded error text.
 
 ```bash
 pylistall -b
-pylistall -b "*.zip,photo.png"
-pylistall -i "run.exe"
+pylistall -i "*.png" -b
+pylistall -i "*.py" -b "*.png"  # does not add PNG candidates
 ```
 
 ---
@@ -337,7 +347,10 @@ entries, where N must be positive.
 Rules:
 
 * Without `-r`, check only the root `.git` directory or worktree pointer file.
-* With `-r`, discover nested repositories.
+* With `-r`, discover nested repositories in unpruned directories.
+* Discovery is independent of `-i`; explicitly requested logs remain available
+  when `.git` metadata is omitted. Entire omitted parent directories are skipped.
+* Without omissions, `.git` may also appear in the tree and Files as ordinary data.
 * Groups are sorted by absolute `.git` path, case-insensitively.
 * Logs use oneline and decorate; Markdown groups have path subheadings.
 * Missing repositories, empty logs and Git failures have explicit markers.
@@ -368,7 +381,7 @@ limit receive `[...TRUNCATED...]`. This does not limit the tree or Git logs.
 
 Follow file and directory links, including targets outside the root. Directory
 expansion still requires `-r`. Contents use logical relative paths; omit rules
-also check resolved targets. Ancestor cycles and broken followed targets are
+also check resolved targets and their omitted directory ancestors. Ancestor cycles and broken followed targets are
 skipped with warnings, while repeated non-cyclic aliases remain separate.
 An explicitly supplied root link is resolved even without this option.
 
@@ -382,8 +395,8 @@ An explicitly supplied root link is resolved even without this option.
 -D, --dry-run
 ```
 
-Collect accurately and report Markdown UTF-8 bytes, selected file count, skipped
-entries and destinations on stderr. No body is displayed, nothing is copied, and
+Collect accurately and report Markdown UTF-8 bytes, Files entry count, successfully
+collected bodies, discovered entries, skips and destinations on stderr. No body is displayed, nothing is copied, and
 no directories or files are created. Combine with `-c` or `-f` to preview them.
 
 ```bash
@@ -401,7 +414,8 @@ pylistall -r -o -D -c -f context.md
 ```
 
 Set a positive UTF-8 byte budget for the complete enabled Markdown, including
-headings, fences and newlines. Colors, summaries and status messages do not count.
+headings, encoding labels, fences and newlines. Colors, progress, summaries and
+status messages do not count. This budget is not a total memory limit.
 Exceeding the budget returns 1 and delivers no partial terminal body, clipboard
 content or file. Dry-run reports the same size as actual Markdown.
 
@@ -425,6 +439,25 @@ Missing or failed pagers display directly. More receives plain platform-encoded
 text; characters unavailable in the current Windows codepage may be replaced.
 Rich import failures silently fall back to Markdown. Clipboard and file outputs
 always remain Markdown. See [Git's pager defaults](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager).
+
+---
+
+### Disable collection progress
+
+**Optional; enabled on interactive stderr unless `TERM=dumb`.**
+
+```text
+-P, --no-progress
+```
+
+Shows scan, tree and Git operations with a spinner, then checked/candidate and
+successfully collected file counts. No percentage is claimed for unknown totals.
+Paths are literal and clipped to terminal width; refresh is at most 10 times per
+second. Output redirection, `-f`, `-c` and `-D` still allow progress when stderr is
+interactive. Redirect stderr or use `-P` to suppress it. This is independent of
+`-n`, which controls paging. Feedback is cleared before results or the pager.
+Missing or failing progress components quietly disable feedback; Ctrl+C cleans
+resources and returns 130.
 
 ---
 

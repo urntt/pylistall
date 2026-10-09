@@ -36,8 +36,11 @@ def _run_git_log(
     count: int,
     check_size: Optional[Callable[[int], None]] = None,
     chunk_bytes: int = 4096,
+    report: Optional[Callable[..., None]] = None,
 ) -> str:
     """Read logs in chunks and always reap the process after an early abort."""
+    if check_size is not None:
+        check_size(0)
     cmd = ["git", "-C", str(repo_root), "log", "--oneline", "--decorate", "--no-color"]
     if count != GIT_LOG_ALL:
         cmd.append(f"-n{count}")
@@ -57,6 +60,8 @@ def _run_git_log(
             started = False
             while True:
                 data = process.stdout.read1(chunk_bytes)
+                if report is not None:
+                    report("git", str(repo_root))
                 text = decoder.decode(data, final=not data)
                 chunks.append(text)
                 # Ignore only outer whitespace, as the baseline Git output did.
@@ -104,7 +109,7 @@ def _find_git_entries(
         snapshot = scan_directory(root, recursive, follow_links)
     entries = [
         GitEntry(entry.path, entry.is_dir)
-        for entry in snapshot.entries
+        for entry in snapshot.git_entries
         if entry.path.name == ".git"
         and (entry.is_dir or entry.is_file)
         and entry.skipped is None

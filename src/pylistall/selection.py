@@ -2,90 +2,22 @@
 
 from __future__ import annotations
 
+import base64
 import codecs
-import fnmatch
 import io
-import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Iterator, Optional, Sequence
+from typing import Callable, Iterator, Optional
 
+from pylistall.patterns import (
+    flatten_patterns,
+    matches_name,
+    omitted,
+    target_omitted,
+)
 from pylistall.traversal import TraversalResult, scan_directory
 
 BINARY_SAMPLE_BYTES = 8192
-
-DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
-    # Git
-    "**/.git",
-    "**/.git/**",
-    # Python caches / tooling
-    "**/__pycache__/**",
-    "**/.pytest_cache/**",
-    "**/.mypy_cache/**",
-    "**/.ruff_cache/**",
-    "**/.tox/**",
-    # Virtual envs
-    "**/.venv/**",
-    "**/venv/**",
-    # Build artifacts
-    "**/build/**",
-    "**/dist/**",
-    "**/*.egg-info/**",
-    # JS
-    "**/node_modules/**",
-    # IDE
-    "**/.idea/**",
-    "**/.vscode/**",
-    # Common single files
-    "**/.gitignore",
-    "**/.DS_Store",
-    "**/Thumbs.db",
-    # Additional tooling and name-based sensitive omissions.
-    "**/.nox/**",
-    "**/.hypothesis/**",
-    "**/.ipynb_checkpoints/**",
-    "**/__pypackages__/**",
-    "**/.eggs/**",
-    "**/htmlcov/**",
-    "**/.coverage",
-    "**/.coverage.*",
-    "**/.next/**",
-    "**/.nuxt/**",
-    "**/.output/**",
-    "**/.svelte-kit/**",
-    "**/.turbo/**",
-    "**/.parcel-cache/**",
-    "**/.vite/**",
-    "**/coverage/**",
-    "**/.nyc_output/**",
-    "**/*.tsbuildinfo",
-    "**/.eslintcache",
-    "**/.stylelintcache",
-    "**/.cache/**",
-    "**/target/**",
-    "**/.gradle/**",
-    "**/.vs/**",
-    "**/*.swp",
-    "**/*.swo",
-    "**/*~",
-    "**/desktop.ini",
-    "**/pylistall-output-*.md",
-    "**/.env",
-    "**/.env.*",
-    "**/.envrc",
-    "**/.pypirc",
-    "**/.netrc",
-    "**/id_rsa",
-    "**/id_dsa",
-    "**/id_ecdsa",
-    "**/id_ed25519",
-    "**/*.key",
-    "**/*.pem",
-    "**/*.p12",
-    "**/*.pfx",
-    "**/.aws/credentials",
-    "**/.streamlit/secrets.toml",
-)
 
 BINARY_EXTENSIONS: frozenset[str] = frozenset(
     {
@@ -159,42 +91,13 @@ class SelectedFile:
     display_name: str
 
 
-def flatten_patterns(items: Sequence[str]) -> tuple[str, ...]:
-    """Flatten repeated and comma-separated patterns into a single tuple."""
-    patterns: list[str] = []
-    for item in items:
-        for part in item.split(","):
-            part = part.strip()
-            if part:
-                patterns.append(part)
-    return tuple(patterns)
-
-
-def parse_omit_patterns(raw_omit: Sequence[str]) -> tuple[str, ...]:
-    """Parse omit patterns, supporting '-o' without a value for defaults."""
-    enable_default = any(item == "" for item in raw_omit)
-    user_items = [item for item in raw_omit if item != ""]
-    user_patterns = flatten_patterns(user_items)
-
-    if enable_default:
-        # fnmatch requires a prefix for **/. Derive root variants from the
-        # default rules while preserving custom pattern matching semantics.
-        root_patterns = tuple(
-            pattern.removeprefix("**/")
-            for pattern in DEFAULT_OMIT_PATTERNS
-            if pattern.startswith("**/")
-        )
-        return DEFAULT_OMIT_PATTERNS + root_patterns + user_patterns
-    return tuple(user_patterns)
-
-
 def parse_binary_policy(
     raw_binary: Optional[str],
 ) -> BinaryPolicy:
     """Parse '-b/--binary' policy.
 
     raw_binary:
-    - None: binary disabled (except binaries forced by -i)
+    - None: binary body expansion disabled
     - ""  : binary enabled for all binaries
     - str : binary enabled with whitelist patterns
     """
@@ -205,11 +108,6 @@ def parse_binary_policy(
         return BinaryPolicy(enabled=True, patterns=tuple())
 
     return BinaryPolicy(enabled=True, patterns=flatten_patterns([raw_binary]))
-
-
-def matches_any(target: str, patterns: Iterable[str]) -> bool:
-    """Return True if target matches any glob pattern."""
-    return any(fnmatch.fnmatch(target, pattern) for pattern in patterns)
 
 
 def is_probably_binary(path: Path) -> bool:
@@ -260,20 +158,33 @@ def is_probably_binary(path: Path) -> bool:
     return (bad_count / max(1, len(sample))) > 0.30
 
 
-def read_text(
+@dataclass(frozen=True)
+class ReadResult:
+    text: str
+    encoding: str
+    truncated: bool = False
+    error: Optional[str] = None
+
+
+def read_content(
     path: Path,
     max_bytes: Optional[int],
     check_size: Optional[Callable[[int], None]] = None,
     chunk_bytes: int = 4096,
-) -> str:
-    """Decode bounded chunks, retaining single-file truncation semantics."""
+    *,
+    binary: bool = False,
+    report: Optional[Callable[..., None]] = None,
+) -> ReadResult:
+    """Read a raw prefix; stream either UTF-8 replacement text or padded Base64."""
     decoder = io.IncrementalNewlineDecoder(
         codecs.getincrementaldecoder("utf-8")(errors="replace"), translate=True
     )
     chunks: list[str] = []
-    size = 0
-    consumed = 0
+    size = consumed = 0
+    carry = b""
     truncated = False
+    if check_size is not None:
+        check_size(0)
     try:
         with path.open("rb") as handle:
             while True:
@@ -282,29 +193,49 @@ def read_text(
                     if max_bytes is None
                     else min(chunk_bytes, max_bytes - consumed)
                 )
+                if remaining == 0:
+                    truncated = bool(handle.read(1))
+                    break
                 data = handle.read(remaining)
                 if not data:
-                    if max_bytes == 0:
-                        truncated = bool(handle.read(1))
                     break
                 consumed += len(data)
-                text = decoder.decode(data, final=False)
+                if binary:
+                    joined = carry + data
+                    complete = len(joined) // 3 * 3
+                    text = base64.b64encode(joined[:complete]).decode("ascii")
+                    carry = joined[complete:]
+                else:
+                    text = decoder.decode(data, final=False)
                 chunks.append(text)
                 size += len(text.encode("utf-8"))
                 if check_size is not None:
                     check_size(size)
-                if max_bytes is not None and consumed == max_bytes:
-                    truncated = bool(handle.read(1))
-                    break
+                if report is not None:
+                    report("files", str(path))
     except OSError as exc:
-        return f"[Failed to read file: {exc}]"
-    tail = decoder.decode(b"", final=True)
-    if truncated:
+        return ReadResult(f"[Failed to read file: {exc}]", "utf-8", error=str(exc))
+    tail = (
+        base64.b64encode(carry).decode("ascii")
+        if binary
+        else decoder.decode(b"", final=True)
+    )
+    if truncated and not binary:
         tail += "\n\n[...TRUNCATED...]\n"
     chunks.append(tail)
     if check_size is not None:
         check_size(size + len(tail.encode("utf-8")))
-    return "".join(chunks)
+    return ReadResult("".join(chunks), "Base64" if binary else "utf-8", truncated)
+
+
+def read_text(
+    path: Path,
+    max_bytes: Optional[int],
+    check_size: Optional[Callable[[int], None]] = None,
+    chunk_bytes: int = 4096,
+) -> str:
+    """Convenience text reader backed by the single structured reading implementation."""
+    return read_content(path, max_bytes, check_size, chunk_bytes).text
 
 
 def _is_included(
@@ -315,9 +246,7 @@ def _is_included(
     """Check include patterns against filename and relative path."""
     if not include_patterns:
         return True
-    return matches_any(filename, include_patterns) or matches_any(
-        rel_str, include_patterns
-    )
+    return matches_name(filename, rel_str, include_patterns)
 
 
 def _is_omitted(
@@ -328,36 +257,36 @@ def _is_omitted(
     """Check omit patterns against filename and relative path."""
     if not omit_patterns:
         return False
-    return matches_any(filename, omit_patterns) or matches_any(rel_str, omit_patterns)
+    return omitted(filename, rel_str, omit_patterns)
 
 
-def _binary_allowed_by_b(
+def binary_allowed(
     filename: str,
     rel_str: str,
     policy: BinaryPolicy,
 ) -> bool:
-    """Return True if binary is allowed by -b policy (excluding -i force)."""
+    """Return True if binary is allowed by -b policy (independent of name inclusion)."""
     if not policy.enabled:
         return False
     if not policy.patterns:
         return True
-    return matches_any(filename, policy.patterns) or matches_any(
-        rel_str, policy.patterns
-    )
+    return matches_name(filename, rel_str, policy.patterns)
 
 
 def iter_selected_files(
     root: Path,
     selection: SelectionOptions,
-    binary_policy: BinaryPolicy,
     *,
     snapshot: Optional[TraversalResult] = None,
     excluded: Optional[Path] = None,
 ) -> Iterator[SelectedFile]:
-    """Select files for content output based on -i/-o/-b and binary rules."""
+    """Select name-matching candidates without sampling or expanding contents."""
     if snapshot is None:
-        snapshot = scan_directory(root, selection.recursive, selection.follow_links)
+        snapshot = scan_directory(
+            root, selection.recursive, selection.follow_links, omit=selection.omit
+        )
     root = snapshot.root
+    excluded_target = excluded.resolve() if excluded is not None else None
     for entry in sorted(
         snapshot.entries,
         key=lambda item: (
@@ -370,7 +299,7 @@ def iter_selected_files(
         file_path = entry.resolved_path
         assert file_path is not None
         if excluded is not None:
-            if entry.path == excluded or file_path == excluded.resolve():
+            if entry.path == excluded or file_path == excluded_target:
                 continue
             try:
                 if file_path.samefile(excluded):
@@ -386,21 +315,8 @@ def iter_selected_files(
 
         if _is_omitted(filename, rel_str, selection.omit):
             continue
-        try:
-            target_relative = Path(os.path.relpath(file_path, root)).as_posix()
-        except ValueError:
-            target_relative = file_path.as_posix()
-        if _is_omitted(file_path.name, target_relative, selection.omit):
+        if target_omitted(file_path, root, selection.omit):
             continue
-
-        is_binary = is_probably_binary(file_path)
-        if is_binary:
-            # Priority: -i can force-include binaries even without -b.
-            if selection.include and included:
-                pass
-            else:
-                if not _binary_allowed_by_b(filename, rel_str, binary_policy):
-                    continue
 
         display = rel_str if selection.recursive else filename
         yield SelectedFile(
@@ -413,14 +329,11 @@ def iter_selected_files(
 def select_files_for_content(
     root: Path,
     selection: SelectionOptions,
-    binary_policy: BinaryPolicy,
     *,
     snapshot: Optional[TraversalResult] = None,
     excluded: Optional[Path] = None,
 ) -> list[SelectedFile]:
     """Materialize selection for callers that need the complete candidate list."""
     return list(
-        iter_selected_files(
-            root, selection, binary_policy, snapshot=snapshot, excluded=excluded
-        )
+        iter_selected_files(root, selection, snapshot=snapshot, excluded=excluded)
     )

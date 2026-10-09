@@ -3,15 +3,31 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
+from pylistall.names import visible_name
+from pylistall.patterns import matches_name
 from pylistall.traversal import FilesystemEntry, TraversalResult, scan_directory
 
 
-def render_tree(snapshot: TraversalResult) -> str:
+def render_tree(
+    snapshot: TraversalResult,
+    include: tuple[str, ...] = (),
+    report: Optional[Callable[..., None]] = None,
+) -> str:
     """Render iteratively, including unexpanded links and failed entries."""
     children: dict[Path, list[FilesystemEntry]] = {}
+    kept = set()
+    if include:
+        for entry in snapshot.entries:
+            if (not entry.is_dir or entry.skipped is not None) and matches_name(
+                entry.path.name, entry.relative_path.as_posix(), include
+            ):
+                kept.add(entry.relative_path)
+                kept.update(entry.relative_path.parents)
     for entry in snapshot.entries:
+        if include and entry.relative_path not in kept:
+            continue
         children.setdefault(entry.relative_path.parent, []).append(entry)
     for siblings in children.values():
         siblings.sort(
@@ -28,7 +44,9 @@ def render_tree(snapshot: TraversalResult) -> str:
     ]
     while stack:
         entry, prefix, last = stack.pop()
-        name = entry.path.name + ("@" if entry.is_link else "")
+        if report is not None:
+            report("tree", str(entry.path))
+        name = visible_name(entry.path.name) + ("@" if entry.is_link else "")
         name += "/" if entry.is_dir else ""
         lines.append(f"{prefix}{'└── ' if last else '├── '}{name}")
         nested = children.get(entry.relative_path, [])
@@ -44,10 +62,12 @@ def build_tree_text(
     follow_links: bool = False,
     *,
     snapshot: Optional[TraversalResult] = None,
+    include: tuple[str, ...] = (),
+    report: Optional[Callable[..., None]] = None,
 ) -> str:
     """Render an existing scan, or discover entries for standalone callers."""
     if snapshot is None:
         if not root.exists() or not root.is_dir():
             return ""
         snapshot = scan_directory(root, recursive, follow_links)
-    return render_tree(snapshot)
+    return render_tree(snapshot, include, report)

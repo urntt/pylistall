@@ -14,7 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from pylistall.output import GROUPS, OutputDocument
+from pylistall.names import visible_name
+from pylistall.output import BINARY_PLACEHOLDER, GROUPS, TRUNCATED, OutputDocument
 
 # POSIX SIGPIPE is returned either as -13 or as the shell status 128 + 13.
 NORMAL_PAGER_EXIT_CODES = {0, -13, 141}
@@ -46,11 +47,12 @@ def render_terminal(
             emoji=False,
             legacy_windows=False,
         )
-        if document.root is not None:
-            console.print(Text(document.root, style="bold cyan"))
+        console.print(Text(visible_name(document.project_name), style="bold cyan"))
+        if document.path is not None:
+            console.print(Text(visible_name(document.path)))
         if document.tree is not None:
-            console.rule(Text("Directory tree"), style="cyan")
             console.print(Text(document.tree or "(empty)"))
+        console.print()
         for part, blocks in [("git", document.git), ("files", document.files)]:
             if blocks is None:
                 continue
@@ -58,7 +60,13 @@ def render_terminal(
             if not blocks:
                 console.print(Text(GROUPS[part][1]))
             for block in blocks:
-                console.print(Text(block.title, style="bold cyan"))
+                console.print(Text(visible_name(block.title), style="bold cyan"))
+                if block.text is None:
+                    console.print(Text(BINARY_PLACEHOLDER))
+                    console.print()
+                    continue
+                if block.encoding == "Base64":
+                    console.print(Text("Encoding: Base64"))
                 console.print(
                     Syntax(
                         block.text,
@@ -69,6 +77,8 @@ def render_terminal(
                         theme="ansi_dark",
                     )
                 )
+                if block.encoding == "Base64" and block.truncated:
+                    console.print(Text(TRUNCATED))
                 console.print()
         return output.getvalue()
     except ImportError:
@@ -148,7 +158,7 @@ def run_pager(text: str, command: PagerCommand) -> bool:
     except KeyboardInterrupt:
         process.kill()
         process.wait()
-        return True
+        raise
     finally:
         if process.stdin is not None:
             try:

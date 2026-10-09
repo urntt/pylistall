@@ -7,7 +7,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 from pylistall import gitlog
 from pylistall.destinations import (
@@ -16,6 +16,7 @@ from pylistall.destinations import (
     write_output,
 )
 from pylistall.gitlog import GitLogOptions
+from pylistall.names import project_name
 from pylistall.output import (
     ContentBlock,
     MarkdownBuilder,
@@ -24,20 +25,21 @@ from pylistall.output import (
     block_markdown,
     empty_group,
     group_heading,
+    introduction,
     language_for,
-    root_markdown,
-    tree_markdown,
 )
+from pylistall.patterns import flatten_patterns, parse_omit_patterns
+from pylistall.progress import CollectionProgress
 from pylistall.selection import (
     BinaryPolicy,
     SelectionOptions,
-    flatten_patterns,
+    binary_allowed,
+    is_probably_binary,
     iter_selected_files,
     parse_binary_policy,
-    parse_omit_patterns,
-    read_text,
+    read_content,
 )
-from pylistall.traversal import scan_directory
+from pylistall.traversal import TraversalResult, scan_directory
 from pylistall.tree import build_tree_text
 from pylistall.util import copy_to_clipboard
 from pylistall.viewer import display
@@ -68,22 +70,48 @@ def _build_output(
     disabled: tuple[str, ...] = (),
     maximum: Optional[int] = None,
     excluded: Optional[Path] = None,
+    report: Optional[Callable[..., None]] = None,
 ) -> OutputResult:
     """Collect enabled parts once, checking budgets before any delivery."""
     root = root.resolve(strict=True)
-    snapshot = scan_directory(root, selection.recursive, selection.follow_links)
+    name = project_name(root)
     builder = MarkdownBuilder(maximum)
-    root_text = str(root) if "root" not in disabled else None
+    path_text = str(root) if "path" not in disabled else None
+    # Reject an impossible title budget before enumerating the filesystem.
+    builder.check(len(introduction(name, path_text, None).encode("utf-8")))
+    collect_git = git_options.enabled and "git" not in disabled
+    need_scan = "tree" not in disabled or "files" not in disabled or collect_git
+    snapshot = (
+        scan_directory(
+            root,
+            selection.recursive,
+            selection.follow_links,
+            omit=selection.omit,
+            collect_git=collect_git,
+            report=report,
+        )
+        if need_scan
+        else TraversalResult(root, (), ())
+    )
     tree_text = None
     logs = None
     files = None
-    if root_text is not None:
-        builder.append(root_markdown(root_text))
+    checked = collected = candidate_count = 0
     if "tree" not in disabled:
-        tree_text = build_tree_text(root, selection.recursive, snapshot=snapshot)
-        builder.append(tree_markdown(tree_text))
+        if report is not None:
+            report("tree", str(root))
+        tree_text = build_tree_text(
+            root,
+            selection.recursive,
+            snapshot=snapshot,
+            include=selection.include,
+            report=report,
+        )
+    builder.append(introduction(name, path_text, tree_text))
     chunk_bytes = min(4096, maximum + 1) if maximum is not None else 4096
-    if git_options.enabled and "git" not in disabled:
+    if collect_git:
+        if report is not None:
+            report("git", str(root))
         builder.append(group_heading("git"))
         logs = []
         entries, _ = gitlog._find_git_entries(
@@ -91,11 +119,14 @@ def _build_output(
         )
         for entry in entries:
             title = str(entry.git_path.resolve())
+            if report is not None:
+                report("git", title)
             text = gitlog._run_git_log(
                 entry.git_path.parent,
                 gitlog.GIT_LOG_ALL if git_options.count is None else git_options.count,
                 check_size=builder.body_checker(title, "text"),
                 chunk_bytes=chunk_bytes,
+                report=report,
             )
             block = ContentBlock(title, text)
             builder.append(block_markdown(block))
@@ -105,28 +136,68 @@ def _build_output(
     if "files" not in disabled:
         builder.append(group_heading("files"))
         files = []
-        for item in iter_selected_files(
-            root, selection, binary_policy, snapshot=snapshot, excluded=excluded
-        ):
-            language = language_for(item.display_name)
-            text = read_text(
-                item.absolute_path,
-                selection.max_bytes,
-                builder.body_checker(item.display_name, language),
-                chunk_bytes,
+        candidates = list(
+            iter_selected_files(root, selection, snapshot=snapshot, excluded=excluded)
+        )
+        candidate_count = len(candidates)
+        if report is not None:
+            report("files", str(root), total=candidate_count, checked=0, collected=0)
+        for item in candidates:
+            if report is not None:
+                report("files", str(item.absolute_path))
+            # Check minimum metadata before sampling or starting the next file.
+            builder.body_checker(item.display_name, "text")(0)
+            binary = is_probably_binary(item.absolute_path)
+            allowed = not binary or binary_allowed(
+                item.relative_path.name, item.relative_path.as_posix(), binary_policy
             )
-            block = ContentBlock(item.display_name, text, language)
+            if not allowed:
+                block = ContentBlock(item.display_name, None)
+            else:
+                language = "text" if binary else language_for(item.display_name)
+                result = read_content(
+                    item.absolute_path,
+                    selection.max_bytes,
+                    builder.body_checker(
+                        item.display_name, language, "Base64" if binary else None
+                    ),
+                    chunk_bytes,
+                    binary=binary,
+                    report=report,
+                )
+                block = ContentBlock(
+                    item.display_name,
+                    result.text,
+                    language,
+                    result.encoding,
+                    result.truncated,
+                    result.error,
+                )
+                collected += int(result.error is None)
             builder.append(block_markdown(block))
             files.append(block)
+            checked += 1
+            if report is not None:
+                report(
+                    "files",
+                    str(item.absolute_path),
+                    checked=checked,
+                    collected=collected,
+                )
         if not files:
             builder.append(empty_group("files"))
     document = OutputDocument(
-        root_text,
-        tree_text,
-        None if logs is None else tuple(logs),
-        None if files is None else tuple(files),
-        snapshot.warnings,
-        sum(entry.skipped is not None for entry in snapshot.entries),
+        project_name=name,
+        path=path_text,
+        tree=tree_text,
+        git=None if logs is None else tuple(logs),
+        files=None if files is None else tuple(files),
+        warnings=snapshot.warnings,
+        skipped_count=sum(entry.skipped is not None for entry in snapshot.entries),
+        discovered_count=snapshot.discovered_count,
+        candidate_count=candidate_count,
+        checked_count=checked,
+        collected_count=collected,
     )
     return OutputResult(builder.text(), document)
 
@@ -165,7 +236,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--include",
         action="append",
         default=[],
-        help="Include glob patterns (repeatable, comma-separated supported).",
+        help="Filter file names in tree and Files (repeatable, comma-separated).",
     )
 
     # -o can be passed without a value to enable default omit patterns.
@@ -179,14 +250,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="PATTERN",
         help=(
-            "Omit glob patterns (repeatable, comma-separated supported). "
+            "Omit names and prune directories (repeatable, comma-separated). "
             "If provided without PATTERN, enable default omit set."
         ),
     )
 
     # -b can be passed without a value to include all binary files.
     # If provided with PATTERN, only that subset of binaries is enabled.
-    # -i can still force-include binaries even when -b is absent.
     parser.add_argument(
         "-b",
         "--binary",
@@ -195,7 +265,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATTERN",
         help=(
-            "Include binary files. Use -b for all binaries, "
+            "Expand candidate binaries as Base64. Use -b for all binaries, "
             "or -b PATTERN for a binary whitelist (comma-separated supported)."
         ),
     )
@@ -246,7 +316,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="PARTS",
-        help="Omit root,tree,git,files (repeatable, comma-separated).",
+        help="Omit path,tree,git,files (repeatable, comma-separated).",
     )
     parser.add_argument(
         "-D",
@@ -264,6 +334,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-n", "--no-pager", action="store_true", help="Disable interactive paging."
     )
+    parser.add_argument(
+        "-P", "--no-progress", action="store_true", help="Disable collection progress."
+    )
     return parser
 
 
@@ -272,13 +345,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = _build_parser()
     args = parser.parse_args(argv)
     args.disable = flatten_patterns(args.disable)
-    if set(args.disable) - {"root", "tree", "git", "files"}:
-        parser.error("--disable accepts only root, tree, git, files")
-    enabled = {"root", "tree", "files"}
-    if args.git_log is not None:
-        enabled.add("git")
-    if not enabled - set(args.disable):
-        parser.error("at least one output part must remain enabled")
+    if set(args.disable) - {"path", "tree", "git", "files"}:
+        parser.error("--disable accepts only path, tree, git, files")
     if args.overwrite and args.file is None:
         parser.error("--overwrite requires --file")
     if args.max_output_bytes is not None and args.max_output_bytes <= 0:
@@ -290,33 +358,39 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return args
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def _main(argv: Optional[Sequence[str]] = None) -> int:
     """Collect once and independently report the outcome of each destination."""
     args = parse_args(argv)
     root = Path(args.path).expanduser()
-    if not root.is_dir():
-        print(f"Error: path is not a directory: {root}", file=sys.stderr)
+    try:
+        root = root.resolve(strict=True)
+        if not root.is_dir():
+            raise NotADirectoryError(str(root))
+    except (OSError, RuntimeError) as exc:
+        print(f"Error: path is not a directory: {root} ({exc})", file=sys.stderr)
         return 2
     destination = None
     try:
         if args.file is not None:
             destination = resolve_destination(args.file, Path.cwd())
             validate_destination(destination, args.overwrite)
-        result = _build_output(
-            root,
-            SelectionOptions(
-                bool(args.recursive),
-                flatten_patterns(args.include),
-                parse_omit_patterns(args.omit),
-                args.max_bytes,
-                args.follow_links,
-            ),
-            parse_binary_policy(args.binary),
-            GitLogOptions(args.git_log is not None, args.git_log),
-            disabled=args.disable,
-            maximum=args.max_output_bytes,
-            excluded=destination,
-        )
+        with CollectionProgress(args.no_progress) as progress:
+            result = _build_output(
+                root,
+                SelectionOptions(
+                    bool(args.recursive),
+                    flatten_patterns(args.include),
+                    parse_omit_patterns(args.omit),
+                    args.max_bytes,
+                    args.follow_links,
+                ),
+                parse_binary_policy(args.binary),
+                GitLogOptions(args.git_log is not None, args.git_log),
+                disabled=args.disable,
+                maximum=args.max_output_bytes,
+                excluded=destination,
+                report=progress.update,
+            )
     except (OSError, RuntimeError, OutputTooLarge) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -332,7 +406,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             destinations.append("clipboard")
         print(
             f"Dry run: {len(result.text.encode('utf-8'))} UTF-8 bytes; "
-            f"files: {result.file_count}; skipped entries: {result.document.skipped_count}; "
+            f"files: {result.file_count}; collected: {result.document.collected_count}; "
+            f"discovered: {result.document.discovered_count}; skipped entries: {result.document.skipped_count}; "
             + "; ".join(destinations),
             file=sys.stderr,
         )
@@ -341,7 +416,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if destination is not None:
         try:
             write_output(destination, result.text, args.overwrite)
-            print(f"Saved: {destination} (files: {result.file_count})", file=sys.stderr)
+            print(
+                f"Saved: {destination} (files: {result.file_count}; collected: {result.document.collected_count})",
+                file=sys.stderr,
+            )
         except OSError as exc:
             failed = True
             print(f"Error: file output failed: {exc}", file=sys.stderr)
@@ -350,11 +428,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.copy:
         try:
             copy_to_clipboard(result.text)
-            print(f"Copied to clipboard (files: {result.file_count})", file=sys.stderr)
+            print(
+                f"Copied to clipboard (files: {result.file_count}; collected: {result.document.collected_count})",
+                file=sys.stderr,
+            )
         except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             failed = True
             print(f"Error: clipboard copy failed: {exc}", file=sys.stderr)
     return int(failed)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Translate cancellation into the conventional status after resource cleanup."""
+    try:
+        return _main(argv)
+    except KeyboardInterrupt:
+        print("Cancelled", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

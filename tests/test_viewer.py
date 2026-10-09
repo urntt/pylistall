@@ -21,6 +21,7 @@ class Terminal(io.StringIO):
 @pytest.fixture
 def document():
     return OutputDocument(
+        "project",
         "C:/project/[bold]🙂",
         "└── source.py",
         (),
@@ -33,7 +34,7 @@ def test_rich_renders_literal_paths_without_fences_or_numbers(document):
     assert "[bold]🙂" in text and "[red]中文.py" in text
     assert 'print("中文🙂")' in text
     assert "```" not in text and "\x1b" not in text
-    assert "Directory tree" in text and "Files" in text
+    assert "Directory tree" not in text and "Files" in text
 
 
 @pytest.mark.parametrize("missing", ["rich.console", "rich.syntax", "pygments"])
@@ -206,6 +207,27 @@ def test_failed_pager_initialization_falls_back(monkeypatch):
     assert not viewer.run_pager("text", viewer.PagerCommand(("less",), "less"))
 
 
+def test_pager_cancellation_reaps_and_propagates(monkeypatch):
+    class Process:
+        stdin = io.BytesIO()
+        killed = waited = False
+
+        def communicate(self, data):
+            raise KeyboardInterrupt()
+
+        def kill(self):
+            self.killed = True
+
+        def wait(self):
+            self.waited = True
+
+    process = Process()
+    monkeypatch.setattr(viewer.subprocess, "Popen", lambda *args, **kwargs: process)
+    with pytest.raises(KeyboardInterrupt):
+        viewer.run_pager("text", viewer.PagerCommand(("less",), "less"))
+    assert process.killed and process.waited and process.stdin.closed
+
+
 def test_rich_color_and_no_color(document, monkeypatch):
     monkeypatch.delenv("NO_COLOR", raising=False)
     monkeypatch.setenv("TERM", "xterm-256color")
@@ -217,7 +239,7 @@ def test_real_closed_downstream_pipe_has_no_traceback():
     import subprocess
     import sys
 
-    code = 'from pylistall.viewer import display; from pylistall.output import OutputDocument; display(OutputDocument(None,None,None,None), "x"*2000000)'
+    code = 'from pylistall.viewer import display; from pylistall.output import OutputDocument; display(OutputDocument("project",None,None,None,None), "x"*2000000)'
     process = subprocess.Popen(
         [sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )

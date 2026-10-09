@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from pylistall.names import inline_code, visible_name
+
 LANGUAGES = {
     ".py": "python",
     ".pyi": "python",
@@ -43,18 +45,26 @@ class OutputTooLarge(Exception):
 @dataclass(frozen=True)
 class ContentBlock:
     title: str
-    text: str
+    text: Optional[str]
     language: str = "text"
+    encoding: Optional[str] = None
+    truncated: bool = False
+    error: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class OutputDocument:
-    root: Optional[str]
+    project_name: str
+    path: Optional[str]
     tree: Optional[str]
     git: Optional[tuple[ContentBlock, ...]]
     files: Optional[tuple[ContentBlock, ...]]
     warnings: tuple[str, ...] = ()
     skipped_count: int = 0
+    discovered_count: int = 0
+    candidate_count: int = 0
+    checked_count: int = 0
+    collected_count: int = 0
 
 
 def language_for(path: str) -> str:
@@ -63,13 +73,6 @@ def language_for(path: str) -> str:
     if name == "dockerfile":
         return "dockerfile"
     return LANGUAGES.get(Path(name).suffix, "text")
-
-
-def escape_path(path: str) -> str:
-    """Prevent a literal filename from becoming Markdown syntax."""
-    path = path.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    path = path.replace("\r", "&#13;").replace("\n", "&#10;")
-    return re.sub(r"([\\`*_{}\[\]()#+.!|~])", r"\\\1", path)
 
 
 def fenced(text: str, language: str = "text") -> str:
@@ -83,16 +86,33 @@ def fenced(text: str, language: str = "text") -> str:
     )
 
 
+BINARY_PLACEHOLDER = "[Binary content not expanded; use -b to allow Base64 output]"
+TRUNCATED = "[...TRUNCATED...]"
+
+
 def block_markdown(block: ContentBlock) -> str:
-    return f"\n### {escape_path(block.title)}\n\n{fenced(block.text, block.language)}"
+    header = f"\n### {inline_code(block.title)}\n\n"
+    if block.text is None:
+        return header + BINARY_PLACEHOLDER + "\n"
+    encoding = "Encoding: Base64\n\n" if block.encoding == "Base64" else ""
+    marker = (
+        "\n" + TRUNCATED + "\n"
+        if block.encoding == "Base64" and block.truncated
+        else ""
+    )
+    return header + encoding + fenced(block.text, block.language) + marker
 
 
-def root_markdown(root: str) -> str:
-    return escape_path(root) + "\n"
-
-
-def tree_markdown(tree: str) -> str:
-    return "\n## Directory tree\n\n" + fenced(tree or "(empty)")
+def introduction(name: str, path: Optional[str], tree: Optional[str]) -> str:
+    text = f"# {inline_code(name)}\n"
+    lines = []
+    if path is not None:
+        lines.append(visible_name(path))
+    if tree is not None:
+        lines.append(tree or "(empty)")
+    if lines:
+        text += "\n" + fenced("\n".join(lines), "bash")
+    return text
 
 
 GROUPS = {
@@ -127,11 +147,16 @@ class MarkdownBuilder:
         self.size += size
         self.chunks.append(text)
 
-    def body_checker(self, title: str, language: str):
+    def body_checker(self, title: str, language: str, encoding: Optional[str] = None):
         # A trailing body newline can remove one formatting byte. Longer fences
         # are checked exactly when the complete block is appended.
         overhead = (
-            len(block_markdown(ContentBlock(title, "", language)).encode("utf-8")) - 1
+            len(
+                block_markdown(ContentBlock(title, "", language, encoding)).encode(
+                    "utf-8"
+                )
+            )
+            - 1
         )
         return lambda size: self.check(overhead + size)
 
@@ -142,10 +167,7 @@ class MarkdownBuilder:
 def render_markdown(document: OutputDocument) -> str:
     """Render the same canonical sections used during collection accounting."""
     builder = MarkdownBuilder()
-    if document.root is not None:
-        builder.append(root_markdown(document.root))
-    if document.tree is not None:
-        builder.append(tree_markdown(document.tree))
+    builder.append(introduction(document.project_name, document.path, document.tree))
     if document.git is not None:
         builder.append(group_heading("git"))
         for block in document.git:

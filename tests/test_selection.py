@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from pylistall import cli
+from pylistall.patterns import parse_omit_patterns
 from pylistall.selection import (
     SelectionOptions,
     is_probably_binary,
-    parse_binary_policy,
-    parse_omit_patterns,
     read_text,
     select_files_for_content,
 )
@@ -17,21 +17,24 @@ from pylistall.selection import (
 def selected_names(root, *, recursive=False, include=(), omit=(), binary=None):
     """Return displayed names selected by the public selection API."""
     selection = SelectionOptions(recursive, include, omit, None)
-    return [
-        item.display_name
-        for item in select_files_for_content(
-            root, selection, parse_binary_policy(binary)
+    if binary is not None:
+        result = cli._build_output(
+            root,
+            selection,
+            cli.parse_binary_policy(binary),
+            cli.GitLogOptions(False, None),
         )
-    ]
+        return [block.title for block in result.document.files]
+    return [item.display_name for item in select_files_for_content(root, selection)]
 
 
-def test_default_selects_only_direct_text_files(tmp_path, write_file):
+def test_default_candidates_include_direct_binary_names(tmp_path, write_file):
     write_file("z.txt", "last")
     write_file("A.py", "first")
     write_file("image.png", b"\x89PNG\x00\xff")
     write_file("nested/child.py", "nested")
 
-    assert selected_names(tmp_path) == ["A.py", "z.txt"]
+    assert selected_names(tmp_path) == ["A.py", "image.png", "z.txt"]
 
 
 def test_recursive_selection_uses_relative_paths(tmp_path, write_file):
@@ -84,7 +87,7 @@ def test_omit_overrides_binary_and_include(tmp_path, write_file, binary):
     )
 
 
-def test_include_can_force_binary_without_binary_flag(tmp_path, write_file):
+def test_include_selects_binary_name_without_content_permission(tmp_path, write_file):
     write_file("image.png", b"\x00\xff")
     write_file("archive.zip", b"\x00\xff")
 
@@ -94,13 +97,15 @@ def test_include_can_force_binary_without_binary_flag(tmp_path, write_file):
 @pytest.mark.parametrize(
     ("binary", "expected"),
     [
-        (None, ["main.py"]),
+        (None, ["archive.zip", "image.png", "main.py"]),
         ("", ["archive.zip", "image.png", "main.py"]),
-        ("*.png", ["image.png", "main.py"]),
+        ("*.png", ["archive.zip", "image.png", "main.py"]),
         ("*.png, *.zip", ["archive.zip", "image.png", "main.py"]),
     ],
 )
-def test_binary_policy_preserves_text_files(tmp_path, write_file, binary, expected):
+def test_binary_policy_does_not_change_name_candidates(
+    tmp_path, write_file, binary, expected
+):
     write_file("main.py", "source")
     write_file("image.png", b"\x00\xff")
     write_file("archive.zip", b"\x00\xff")

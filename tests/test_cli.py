@@ -3,7 +3,8 @@
 import pytest
 
 from pylistall import cli, selection
-from pylistall.output import escape_path, render_markdown
+from pylistall.names import inline_code
+from pylistall.output import render_markdown
 
 
 @pytest.fixture
@@ -21,7 +22,7 @@ def test_default_command_uses_current_directory(
     assert cli.main([]) == 0
     captured = capsys.readouterr()
     assert copied == []
-    assert captured.out.startswith(escape_path(str(tmp_path.resolve())) + "\n")
+    assert captured.out.startswith("# " + inline_code(tmp_path.name) + "\n")
     assert "print('hello')" in captured.out
     assert captured.err == ""
 
@@ -54,14 +55,14 @@ def test_empty_directory_has_explicit_markers(tmp_path, copied, capsys):
     assert copied == []
 
 
-def test_filters_preserve_tree(tmp_path, write_file, copied):
+def test_filters_control_tree_and_files(tmp_path, write_file, copied):
     write_file("src/main.py", "included source")
     write_file("README.md", "excluded readme")
     write_file(".git/HEAD", "excluded git metadata")
     assert cli.main([str(tmp_path), "-r", "-i", "*.py", "-o", "-c"]) == 0
     text = copied[0]
-    assert "README.md" in text and ".git/" in text
-    assert "### src/main\\.py" in text
+    assert "README.md" not in text and ".git/" not in text
+    assert "### `src/main.py`" in text
     assert "excluded readme" not in text and "excluded git metadata" not in text
 
 
@@ -69,9 +70,9 @@ def test_output_separates_tree_and_file_contents(tmp_path, write_file, copied):
     write_file("main.py", "source")
     assert cli.main([str(tmp_path), "-c"]) == 0
     assert copied == [
-        escape_path(str(tmp_path.resolve())) + "\n\n## Directory tree\n\n"
-        "```text\n└── main.py\n```\n\n## Files\n\n"
-        "### main\\.py\n\n```python\nsource\n```\n"
+        f"# {inline_code(tmp_path.name)}\n\n```bash\n{tmp_path.resolve()}\n"
+        "└── main.py\n```\n\n## Files\n\n"
+        "### `main.py`\n\n```python\nsource\n```\n"
     ]
 
 
@@ -84,7 +85,7 @@ def test_include_patterns(tmp_path, write_file, copied, patterns):
     write_file("README.md", "readme")
     write_file("notes.txt", "notes")
     assert cli.main([str(tmp_path), "-c", *patterns]) == 0
-    assert "### main\\.py" in copied[0] and "### README\\.md" in copied[0]
+    assert "### `main.py`" in copied[0] and "### `README.md`" in copied[0]
     assert "### notes" not in copied[0]
 
 
@@ -122,8 +123,8 @@ def test_disable_skips_sampling_reading_and_git(
     def forbidden(*args, **kwargs):
         pytest.fail("disabled collector was called")
 
-    monkeypatch.setattr(selection, "is_probably_binary", forbidden)
-    monkeypatch.setattr(cli, "read_text", forbidden)
+    monkeypatch.setattr(cli, "is_probably_binary", forbidden)
+    monkeypatch.setattr(cli, "read_content", forbidden)
     monkeypatch.setattr(cli.gitlog, "_run_git_log", forbidden)
     assert cli.main([str(tmp_path), "-g", "-d", "files", "-d", "git", "-c"]) == 0
     assert "source.py" in copied[0] and "never read" not in copied[0]
@@ -133,9 +134,9 @@ def test_disable_skips_sampling_reading_and_git(
 def test_disabled_parts_match_all_destinations(tmp_path, write_file, copied, capsys):
     write_file("source.py", "source")
     target = tmp_path / "result"
-    assert cli.main([str(tmp_path), "-d", "root,tree", "-c", "-f", str(target)]) == 0
+    assert cli.main([str(tmp_path), "-d", "path,tree", "-c", "-f", str(target)]) == 0
     assert target.read_text(encoding="utf-8") == copied[0]
-    assert copied[0].startswith("\n## Files")
+    assert copied[0].startswith(f"# {inline_code(tmp_path.name)}\n\n## Files")
     assert capsys.readouterr().out == ""
 
 
@@ -171,7 +172,7 @@ def test_streaming_budget_stops_before_later_file(
         sampled.append(path.name)
         return original(path)
 
-    monkeypatch.setattr(selection, "is_probably_binary", sample)
+    monkeypatch.setattr(cli, "is_probably_binary", sample)
     assert cli.main([str(tmp_path), "-M", "1000", "-c"]) == 1
     assert sampled == ["a.txt"] and copied == []
     assert capsys.readouterr().out == ""
@@ -187,7 +188,7 @@ def test_markdown_dynamic_fences_paths_languages_and_shared_model(tmp_path, writ
         cli.GitLogOptions(False, None),
     )
     assert render_markdown(result.document) == result.text
-    assert "### a\\[1\\]\\.md" in result.text
+    assert "### `a[1].md`" in result.text
     assert "```````markdown" in result.text
     assert result.document.files[1].language == "text"
 
@@ -239,6 +240,7 @@ def test_broken_pipe_is_normal(tmp_path, monkeypatch):
     "short,long,value",
     [
         ("-n", "--no-pager", None),
+        ("-P", "--no-progress", None),
         ("-r", "--recursive", None),
         ("-l", "--follow-links", None),
         ("-i", "--include", "*.py"),
@@ -279,7 +281,9 @@ def test_documented_markdown_example(tmp_path, write_file):
         selection.parse_binary_policy(None),
         cli.GitLogOptions(False, None),
     )
-    example = render_markdown(replace(result.document, root="/Users/example/project"))
+    example = render_markdown(
+        replace(result.document, project_name="project", path="/Users/example/project")
+    )
     root = Path(__file__).resolve().parents[1]
     for name in ("README.md", "README.zh-CN.md"):
         documented = re.search(
