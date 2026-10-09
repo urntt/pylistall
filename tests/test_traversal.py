@@ -8,10 +8,9 @@ from pathlib import Path
 import pytest
 
 from pylistall import cli, gitlog, traversal
+from pylistall.patterns import parse_omit_patterns
 from pylistall.selection import (
     SelectionOptions,
-    parse_binary_policy,
-    parse_omit_patterns,
     select_files_for_content,
 )
 from pylistall.tree import render_tree
@@ -39,7 +38,6 @@ def names(snapshot, *, omit=(), include=()):
         for item in select_files_for_content(
             snapshot.root,
             SelectionOptions(True, include, omit, None),
-            parse_binary_policy(None),
             snapshot=snapshot,
         )
     ]
@@ -202,9 +200,26 @@ def test_output_symlink_target_excluded_before_sampling(
         selection.select_files_for_content(
             tmp_path,
             SelectionOptions(True, (), (), None, True),
-            parse_binary_policy(None),
             snapshot=snapshot,
             excluded=target,
         )
         == []
     )
+
+
+def test_followed_alias_cannot_bypass_omitted_target_subtree(tmp_path, link_factory):
+    (tmp_path / ".venv").mkdir()
+    (tmp_path / ".venv" / "main.py").write_text("synthetic", encoding="utf-8")
+    link_factory(tmp_path / "innocent.py", tmp_path / ".venv" / "main.py")
+    link_factory(tmp_path / "alias", tmp_path / ".venv", True)
+    snapshot = traversal.scan_directory(tmp_path, True, True, omit=(".venv",))
+    assert snapshot.entries == ()
+    assert snapshot.discovered_count == 3
+
+
+def test_include_dangling_and_unfollowed_links_by_logical_name(tmp_path, link_factory):
+    link_factory(tmp_path / "match.py", tmp_path / "missing")
+    link_factory(tmp_path / "other.txt", tmp_path / "missing")
+    snapshot = traversal.scan_directory(tmp_path, True)
+    assert render_tree(snapshot, ("*.py",)) == "└── match.py@"
+    assert names(snapshot, include=("*.py",)) == []

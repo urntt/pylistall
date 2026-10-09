@@ -107,3 +107,31 @@ def test_real_git_worktree_log_utf8(tmp_path):
         check=True,
     )
     assert "中文🙂" in gitlog._run_git_log(tmp_path, 1)
+
+
+def test_cancelled_git_is_killed_and_reaped(tmp_path, monkeypatch):
+    class Stream(io.BytesIO):
+        def read1(self, amount):
+            raise KeyboardInterrupt()
+
+    class Process:
+        stdout = Stream()
+        returncode = None
+        killed = waited = False
+
+        def poll(self):
+            return self.returncode
+
+        def kill(self):
+            self.killed = True
+            self.returncode = -1
+
+        def wait(self):
+            self.waited = True
+            return self.returncode
+
+    process = Process()
+    monkeypatch.setattr(gitlog.subprocess, "Popen", lambda *args, **kwargs: process)
+    with pytest.raises(KeyboardInterrupt):
+        gitlog._run_git_log(tmp_path, 1)
+    assert process.killed and process.waited and process.stdout.closed

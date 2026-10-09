@@ -6,6 +6,37 @@ Changes are grouped by the version prepared for release. Publication status and
 dates are recorded in [GitHub Releases](https://github.com/urntt/pylistall/releases).
 Maintainers follow the [release guide](docs/releasing.md).
 
+## [Unreleased]
+
+### Changed
+
+- Filter both tree names and Files with `-i/-o`; prune omitted directories before
+  scanning. The explicit root is exempt. Preserve `fnmatch` and bare/custom omission rules.
+- Discover Git independently of includes and omitted metadata, within unpruned directories.
+- Separate binary name selection from body permission: `-i` no longer grants binary
+  expansion. Unexpanded binaries retain a heading and placeholder; authorized
+  bytes use padded Base64, with raw-byte limits and an external truncation marker.
+- Always show an inline-code project title; combine path/tree in a `bash` block.
+  Use dynamic inline code for paths and visible control characters.
+- Rename disable part `root` to `path` and permit disabling all four parts.
+- Add `-P --no-progress`, stderr collection stages and accurate file counters,
+  without changing paging. Clean cancellation returns 130.
+
+### Migration from 1.0.0
+
+- Replace `-d root` with `-d path`; old `root` is an argument error. Disabling all
+  parts now emits just the project title without scanning.
+- Includes now hide unrelated tree names; omissions hide/prune matching entries.
+  A deep include cannot restore an omitted parent. Bare `-o` prunes root/nested `.venv`.
+- Add `-b` when binary bodies are required, even with `-i`. Binary candidates no
+  longer disappear silently; expect headings/placeholders and Base64 rather than
+  UTF-8 replacement bytes. Binary truncation markers are outside the encoded block.
+- Update Markdown consumers for project title, combined path/tree and inline-code
+  names. Progress is on stderr; use `-P` to suppress it independently of `-n`.
+- Summary `files` counts Files entries; `collected` counts successful bodies.
+
+Version and dependencies remain unchanged; these changes are not yet released.
+
 ## [1.0.0]
 
 ### Added

@@ -21,10 +21,11 @@
 * 复制 Markdown 到剪贴板或保存为单文件（可选）
 * 树状目录结构与绝对根路径
 * 递归遍历子目录（可选，默认禁用）
-* glob 模式包含或排除文件（可选，默认包含非二进制文件）
-* 包含二进制文件与 Git 日志（可选，默认禁用）
+* glob 模式包含或排除文件（可选，同时筛选目录树与 Files）
+* 将二进制展开为 Base64 与包含 Git 日志（可选，默认禁用）
 * 选择输出部分、预览收集结果及限制输出总量
 * 终端分组标题、颜色、代码高亮与交互分页
+* 在交互 stderr 显示收集进度与当前操作
 * 跨平台支持：macOS、Windows、Linux
 
 ---
@@ -82,11 +83,10 @@ pylistall . -r -o -c
 剪贴板文本示例（文件导出和重定向使用相同 Markdown）：
 
 ````markdown
+# `project`
+
+```bash
 /Users/example/project
-
-## Directory tree
-
-```text
 ├── src/
 │   └── main.py
 └── README.txt
@@ -94,13 +94,13 @@ pylistall . -r -o -c
 
 ## Files
 
-### README\.txt
+### `README.txt`
 
 ```text
 Example project.
 ```
 
-### src/main\.py
+### `src/main.py`
 
 ```python
 print("Hello World!")
@@ -109,11 +109,13 @@ print("Hello World!")
 
 注意事项：
 
-* 首行是根路径，随后依次为目录树、可选 Git 分组、文件内容。
-* 目录树反映真实文件系统；内容过滤不隐藏树中的名称。
+* 项目标题始终位于最上方；路径与树共用 `bash` 代码块，随后为可选 Git 分组和 Files。
+* `-i` 同时筛选树和 Files 的文件名，保留连接文件的祖先目录；
+  `-o` 隐藏匹配条目并提前剪掉完整排除的目录。
 * `-r` 控制目录展开，`-l` 控制链接跟随。
 * 文件夹以 `/` 结尾，链接标记 `@`，默认不读取或展开。
-* Markdown 路径按字面量转义；已知类型有语言标签，未知类型使用 `text`，
+* 标题中的名称使用动态反引号行内代码；控制字符显示为可见转义。
+  已知类型有语言标签，未知类型使用 `text`，
   围栏随内容增长避免反引号冲突。
 * 保留内容排序及 `[...TRUNCATED...]` 标记。
 
@@ -209,15 +211,15 @@ pylistall -r -o -f context.md -w
 -d, --disable PARTS
 ```
 
-在所有目的地省略 `root`、`tree`、`git` 或 `files`，可重复或逗号分隔。
-至少保留一个实际启用的输出部分。
+在所有目的地省略 `path`、`tree`、`git` 或 `files`，可重复或逗号分隔。
+项目标题不可禁用；允许禁用全部四个部分，仅输出标题。旧 `root` 名称返回参数错误。
 
 禁用 `files` 不采样或读取文件内容，禁用 `git` 不查询 Git。
 复制、保存与终端展示使用同一组启用部分。
 
 ```bash
 pylistall -r -g 3 -d files
-pylistall -d root,tree -d git -c
+pylistall -d path,tree -d git -c
 ```
 
 ---
@@ -230,13 +232,14 @@ pylistall -d root,tree -d git -c
 -i, --include PATTERN
 ```
 
-仅包含匹配 glob 模式的文件。可重复或逗号分隔，去除首尾空白与空项。
+仅包含匹配 glob 模式的文件。可重复或逗号分隔，去除首尾空白、空项和重复规则。
 通过 `fnmatch` 匹配文件名和逻辑相对路径。
 
 当启用 `-i` 时：
 
-* 只有匹配的文件进入内容输出。
-* 匹配的二进制文件即使没有 `-b` 也可包含。
+* 树和 Files 仅保留匹配的文件名及其祖先目录。
+* 父目录不必匹配，`-i` 不会剪掉扫描范围。
+* 匹配的二进制名称仍展示，但正文必须由 `-b` 授权展开。
 * 匹配的排除规则仍优先。
 
 ---
@@ -249,12 +252,12 @@ pylistall -d root,tree -d git -c
 -o, --omit [PATTERN]
 ```
 
-排除匹配 glob 模式的内容。重复或逗号分隔的值去除空白与空项。
+从树和 Files 排除匹配名称；完整排除的目录不再扫描。重复或逗号分隔的值去除空白、空项和重复规则。
 排除优先于 `-i` 和 `-b`，跟随链接时同时检查逻辑路径和解析目标。
 
 裸 `-o` 在根层和嵌套位置启用默认集：
 
-* Git 元数据、Python 环境／缓存、`build`、`dist`、`*.egg-info`、`node_modules`、
+* Git 元数据、Python 环境／缓存（包含 `.venv`）、`build`、`dist`、`*.egg-info`、`node_modules`、
   `.idea`、`.vscode`、`.gitignore`、`.DS_Store`、`Thumbs.db`。
 * Python／测试：`.nox`、`.hypothesis`、`.ipynb_checkpoints`、`__pypackages__`、
   `.eggs`、`htmlcov`、`.coverage`、`.coverage.*`。
@@ -267,10 +270,14 @@ pylistall -d root,tree -d git -c
   `.aws/credentials`、`.streamlit/secrets.toml`。
 
 名单也会排除部分样例与公开证书，不能检测任意秘密，不加载 `.gitignore`。
-业务日志和依赖锁文件保留；排除内容不会隐藏目录树名称。
+业务日志和依赖锁文件保留。显式收集的根目录本身不参与过滤。
+目录名称、相对路径或相对路径加 `/` 命中时剪枝：`src`、`src/`、`src/**`
+都剪掉 `src`；`src/*.py` 只排除匹配文件，不剪掉 `src`。包含规则无法恢复被排除的子树。
 
 以 `**/` 开头的默认规则也作用于根层。自定义模式保持普通 `fnmatch` 行为，
-不自动启用默认集。需要组合时：
+不自动启用默认集。`*.py` 可按文件名匹配任意层级；`src/*.py` 也可能匹配
+更深路径，因为 `fnmatch` 把 `/` 当普通字符。自定义 `**/.venv/**` 不自动覆盖
+根层 `.venv`；大小写处理保留平台行为。需要组合时：
 
 ```bash
 pylistall -o -o "README.md,test_cases/*"
@@ -286,24 +293,22 @@ pylistall -o -o "README.md,test_cases/*"
 -b, --binary [PATTERN]
 ```
 
-控制二进制包含，不影响文本文件。字节以 UTF-8 替换解码，不转换或解压图片、文档、压缩包。
+只控制已选候选二进制的正文展开，不增加文件名、不改变目录树。
+先由 `-o` 排除，再由 `-i` 筛选名称，最后由 `-b` 授权二进制正文；文本不需要 `-b`。
 
-优先级规则：
+* 未提供 → 保留路径标题和二进制占位说明，不生成正文。
+* 裸 `-b` → 展开全部候选二进制。
+* `-b PATTERN` → 仅展开文件名或逻辑相对路径匹配的候选二进制。
 
-1. `-o` 始终排除匹配的文件，包括二进制。
-2. `-i` 可强制包含指定二进制文件。
-3. `-b` 仅控制其余二进制文件。
-
-包含规则：
-
-* 未提供 → 排除二进制，除非由 `-i` 强制包含。
-* 裸 `-b` → 包含所有二进制。
-* `-b PATTERN` → 仅包含匹配的二进制。
+获准的字节输出标准、带填充、不插入换行的 Base64，标注 `Encoding: Base64`，
+使用 `text` 代码块。Base64 不压缩、不解释文件。`-m` 先限制原始字节前缀再编码，
+编码仍可正确解码；二进制 `[...TRUNCATED...]` 位于代码块外，只能恢复前缀。
+读取失败保留错误标记，不编码错误文字。
 
 ```bash
 pylistall -b
-pylistall -b "*.zip,photo.png"
-pylistall -i "run.exe"
+pylistall -i "*.png" -b
+pylistall -i "*.py" -b "*.png"  # 不额外加入 PNG 候选
 ```
 
 ---
@@ -321,7 +326,10 @@ pylistall -i "run.exe"
 规则：
 
 * 非递归仅检查根层 `.git` 目录或 worktree 指针文件。
-* 递归时查找嵌套仓库。
+* 递归时查找未剪枝目录中的嵌套仓库。
+* 查找独立于 `-i`；`.git` 元数据被排除时仍可显式读取日志，
+  但完整排除的上级目录内不再查找仓库。
+* 未启用排除时，`.git` 仍可作为普通数据出现在树和 Files 中。
 * 分组按绝对 `.git` 路径排序，大小写不敏感。
 * 日志使用 oneline 和 decorate，Markdown 分组使用路径子标题。
 * 无仓库、空日志及 Git 失败都有明确标记。
@@ -351,7 +359,7 @@ pylistall -i "run.exe"
 ```
 
 跟随文件和目录链接，允许根目录之外的目标；目录展开仍需 `-r`。
-内容显示逻辑相对路径，排除也检查解析目标。祖先循环和跟随后断链跳过并警告，
+内容显示逻辑相对路径，排除也检查解析目标及其被排除的目录祖先。祖先循环和跟随后断链跳过并警告，
 非循环的重复别名分别保留。显式传入的根目录链接即使没有此选项也会解析。
 
 ---
@@ -364,7 +372,7 @@ pylistall -i "run.exe"
 -D, --dry-run
 ```
 
-准确收集后向 stderr 报告 Markdown UTF-8 大小、选中文件数、跳过条目及目的地。
+准确收集后向 stderr 报告 Markdown UTF-8 大小、Files 条目数、实际收集数、已发现条目、跳过数及目的地。
 不展示正文、不复制、不创建目录或文件。可与 `-c`、`-f` 组合预览目的地。
 
 ```bash
@@ -381,8 +389,8 @@ pylistall -r -o -D -c -f context.md
 -M, --max-output-bytes N
 ```
 
-为全部启用部分生成的 Markdown 设置正整数 UTF-8 字节预算，包含标题、围栏及换行。
-不计算颜色、摘要和状态提示。超限返回 1，不交付部分终端正文、剪贴板内容或文件。
+为全部启用部分生成的 Markdown 设置正整数 UTF-8 字节预算，包含标题、编码说明、围栏及换行。
+不计算颜色、进度、摘要和状态提示；此预算不等于总内存限制。超限返回 1，不交付部分终端正文、剪贴板内容或文件。
 dry-run 的大小与实际 Markdown 一致。
 
 ---
@@ -402,6 +410,23 @@ Windows 自带程序），再回退系统 `more`。Less 默认 `-FRX`：短输�
 没有分页器或启动失败时直接展示。More 使用无颜色的平台编码，当前 Windows 代码页无法
 表示的字符可能被替换。Rich 导入失败静默回退 Markdown；复制和文件始终保持 Markdown。
 参考 [Git 分页默认值](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager)。
+
+---
+
+### 关闭收集进度
+
+**可选；stderr 为交互终端且 `TERM` 不为 `dumb` 时默认启用。**
+
+```text
+-P, --no-progress
+```
+
+扫描、树组装和 Git 使用转圈显示当前操作，未知总量不显示百分比。
+文件阶段显示已检查／候选总数及实际收集数量。路径按字面量展示并按终端宽度裁剪，
+每秒最多刷新 10 次。stdout 重定向、`-f`、`-c`、`-D` 不单独关闭进度，
+只要 stderr 仍是终端即可显示；重定向 stderr 或使用 `-P` 可关闭。
+此选项与控制分页的 `-n` 独立。正文或分页前先清理进度。
+反馈组件缺失或失效时静默关闭；Ctrl+C 清理资源并返回 130。
 
 ---
 

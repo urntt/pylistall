@@ -21,7 +21,7 @@ AI provider integration required.
 ## Design principles
 
 - Keep the common workflow short, with explicit options for recursion, filtering,
-  binary inclusion, and history.
+  binary expansion, and history.
 - Make selection and output understandable. Preserve observable behavior through
   regression tests and document deliberate changes.
 - Keep collection local. Improve control over what users share without promising
@@ -33,16 +33,19 @@ AI provider integration required.
 
 ## Present scope
 
-The CLI already produces an absolute root path, filesystem tree, file content
-blocks, and optional Git log groups. It supports include/omit patterns, explicit
-binary inclusion, a per-file read limit, enabled-part controls, dry-run summaries and exact total Markdown budgets. Content filters do not hide tree
-entries. The [architecture document](docs/architecture.md) describes the actual
-matching, encoding, failure behavior, and current safety limitations.
+The CLI produces an always-visible project title, a combined path/tree block,
+file content blocks and optional independent Git logs. Name inclusion/omission
+filters tree and Files consistently, with early directory pruning. Binary body
+permission is separate and authorized bytes use Base64. Output parts, raw per-file
+limits, exact Markdown budgets and dry-run remain available. Collection progress
+uses stderr and is independent of terminal paging. The
+[architecture document](docs/architecture.md) describes actual rules and limitations.
 
-Tree, content, and Git discovery share an iterative scan. Links are displayed
-without being followed by default; explicit following permits external targets
-and detects ancestor cycles. Bare `-o` adds common sensitive filenames to its
-omissions, while retaining names in the tree; this is not automatic secret detection.
+Tree, content and Git discovery share an iterative scan. Links are displayed by
+default; explicit following permits external targets and detects ancestor cycles.
+Bare `-o` excludes common generated/sensitive names from both views and scanning;
+it is not automatic secret detection. Text, Base64 and read failures have explicit
+structured states shared by all destinations.
 
 The repository provides behavior tests, uv dependency locking, Ruff checks, CI for
 the minimum and default Python versions on three platforms, and bilingual

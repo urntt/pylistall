@@ -96,7 +96,7 @@ uv sync --locked
 ```
 
 This temporarily changes the project's `.venv` interpreter. Tests currently cover
-the CLI behavior baseline for selection, binary precedence, UTF-8 boundaries, read limits, directory
+the CLI behavior baseline for selection, name selection and binary permission, UTF-8 boundaries, read limits, directory
 trees, CLI output and errors, Git grouping, and clipboard backend selection. They
 use temporary directories and mock clipboard programs, pyperclip, and Git log
 retrieval. They do not modify the real clipboard or require a desktop session.
@@ -123,6 +123,30 @@ Traversal tests create real links in temporary directories, including Windows
 junctions. Symbolic-link tests skip only when Windows denies the required link
 privilege. They cover external targets, ancestor cycles, repeated aliases,
 broken links, exclusion consistency, and nested enumeration failures.
+
+### Collection and terminal acceptance
+
+Regressions cover name views, actual pruning, root exemption, independent Git,
+omitted target ancestors, every disable combination, dynamic name delimiters and
+Base64 raw prefixes. Scan/sample call records establish that feedback does not
+repeat reads. Exact budgets include encoding labels and truncation markers.
+Files entries, checked candidates and successfully collected bodies are separate;
+cancellation covers Git, feedback and transactional write cleanup.
+
+Manually check a disposable sample in a real Windows terminal:
+
+1. Create nested directories, Chinese/emoji names, long paths, empty and large files.
+2. Run `uv run --locked pylistall SAMPLE -r -o -n`; inspect spinner stages, file
+   counts and path clipping, with no invented percentage or interpreted Rich markup.
+3. Redirect stdout and verify stderr feedback plus ANSI-free Markdown; redirect
+   stderr to disable feedback. Check `-P` independently of `-n`.
+4. Check dry-run, file export and cancellation cleanup; keep clipboard mocked.
+5. Check less short-output exit, long-output navigation/search/`q`, with feedback
+   cleared before paging. Ctrl+C returns 130 without traceback and protects originals.
+
+PRs distinguish automated checks from manual UI results. Rerun real-link tests in
+an environment that allows them if the sandbox denies creation. PTY or simulated
+output is not complete real-terminal acceptance; list unverified items explicitly.
 
 ## Build and verify artifacts
 

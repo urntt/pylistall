@@ -111,4 +111,4 @@ def test_existing_output_and_hardlink_alias_excluded(tmp_path, monkeypatch):
     assert cli.main([str(tmp_path), "-f", str(target), "-w", "-c"]) == 0
     assert "previous output" not in copied[0]
     assert "result" in copied[0] and "alias" in copied[0]
-    assert "### result" not in copied[0] and "### alias" not in copied[0]
+    assert "### `result`" not in copied[0] and "### `alias`" not in copied[0]
