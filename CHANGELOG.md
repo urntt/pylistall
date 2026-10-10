@@ -8,6 +8,8 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+## [2.0.0]
+
 ### Changed
 
 - Filter both tree names and Files with `-i/-o`; prune omitted directories before
@@ -42,7 +44,10 @@ Maintainers follow the [release guide](docs/releasing.md).
   names. Progress is on stderr; use `-P` to suppress it independently of `-n`.
 - Summary `files` counts Files entries; `collected` counts successful bodies.
 
-Version and dependencies remain unchanged; these changes are not yet released.
+### Development
+
+- Add a reproducible Windows terminal acceptance sample and document PowerShell
+  encoding and stderr redirection behavior. Keep dependency versions unchanged.
 
 ## [1.0.0]
 
