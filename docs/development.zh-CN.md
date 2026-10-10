@@ -115,7 +115,20 @@ UTF-8 边界、读取上限、目录树、CLI 输出与错误、Git 分组和剪
 
 在真实 Windows 终端用临时样例进行人工验收：
 
-1. 准备含深层目录、中文及 emoji 名称、较长路径、空文件和大文件的可丢弃目录。
+在仓库根目录生成可重复重建的样例，再运行 CLI：
+
+```sh
+uv run --locked python scripts/make_terminal_sample.py
+uv run --locked pylistall .pytest_cache/manual-progress/sample -r -o -D
+uv run --locked pylistall .pytest_cache/manual-progress/sample -r -o
+```
+
+样例含中文／emoji 名称、较长路径、600 个 Python 文件、一个空文件及一个二进制文件。
+dry-run 应显示 `files: 602; collected: 601; discovered: 662`。
+脚本不会覆盖已有样例；`.pytest_cache` 被清理后重新运行生成命令即可恢复。
+以下步骤的 `SAMPLE` 指此样例目录。
+
+1. 使用生成的样例，或准备含深层目录、中文及 emoji 名称、较长路径、空文件和大文件的可丢弃目录。
 2. 运行 `uv run --locked pylistall SAMPLE -r -o -n`，观察扫描转圈、文件计数、路径裁剪，
    以及高亮排版期间的 `render` 路径／块数，
    确认没有错误百分比、Rich 标记解释或状态覆盖正文。
