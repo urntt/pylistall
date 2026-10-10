@@ -135,7 +135,22 @@ cancellation covers Git, feedback and transactional write cleanup.
 
 Manually check a disposable sample in a real Windows terminal:
 
-1. Create nested directories, Chinese/emoji names, long paths, empty and large files.
+Generate the reproducible fixture from the repository root, then run the CLI:
+
+```sh
+uv run --locked python scripts/make_terminal_sample.py
+uv run --locked pylistall .pytest_cache/manual-progress/sample -r -o -D
+uv run --locked pylistall .pytest_cache/manual-progress/sample -r -o
+```
+
+The fixture contains Chinese/emoji names, long paths, 600 Python files, one empty
+file and one binary file. Dry-run should report
+`files: 602; collected: 601; discovered: 662`. The script never replaces an existing
+sample; run it again after `.pytest_cache` is cleared. `SAMPLE` below refers to this
+fixture directory.
+
+1. Use the generated fixture or create nested directories, Chinese/emoji names,
+   long paths, empty and large files in another disposable fixture.
 2. Run `uv run --locked pylistall SAMPLE -r -o -n`; inspect spinner stages, file
    counts and path clipping, then `render` paths/block counts during highlighting,
    with no invented percentage or interpreted Rich markup.
