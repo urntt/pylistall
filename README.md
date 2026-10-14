@@ -473,7 +473,7 @@ resources and returns 130.
 -v, --version
 ```
 
-Print the installed version (for example, `pylistall 2.0.0`) and exit without
+Print the installed version (for example, `pylistall 2.1.0`) and exit without
 collecting context, copying or writing a file.
 
 ---
@@ -546,10 +546,6 @@ Python 3.9 or higher. Git is required only when collecting Git history.
 
 ---
 
-## License
-
-MIT License
-
 ## Contributing
 
 See the [development guide](docs/development.md) for setup, checks, builds, and
@@ -561,3 +557,7 @@ responsibilities and data flow are in [architecture](docs/architecture.md).
 See the [changelog](CHANGELOG.md) for version changes and migration notes, and
 [GitHub Releases](https://github.com/urntt/pylistall/releases) for published versions.
 Maintainers use the [release guide](docs/releasing.md).
+
+## License
+
+MIT License

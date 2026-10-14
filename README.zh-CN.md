@@ -440,7 +440,7 @@ Windows 自带程序），再回退系统 `more`。Less 默认 `-FRX`：短输�
 -v, --version
 ```
 
-输出已安装版本（例如 `pylistall 2.0.0`）后退出，不收集上下文、不复制、不写文件。
+输出已安装版本（例如 `pylistall 2.1.0`）后退出，不收集上下文、不复制、不写文件。
 
 ---
 
@@ -511,10 +511,6 @@ Python 3.9 或更高版本；只有收集 Git 历史时才需要 Git。
 
 ---
 
-## 许可证
-
-MIT License
-
 ## 参与开发
 
 环境准备、检查、构建和贡献步骤见[开发指南](docs/development.zh-CN.md)。
@@ -524,3 +520,7 @@ MIT License
 
 版本变更与迁移说明见[更新记录](CHANGELOG.zh-CN.md)，已发布版本见
 [GitHub Releases](https://github.com/urntt/pylistall/releases)。维护者使用[发布指南](docs/releasing.zh-CN.md)。
+
+## 许可证
+
+MIT License
