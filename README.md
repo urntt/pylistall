@@ -70,8 +70,9 @@ pylistall [path] [options]
 If `[path]` is not provided, the current directory (`.`) is used.
 
 By default, the result is displayed without changing the clipboard. Interactive
-terminals use headings, colors and syntax highlighting without Markdown fences
-or line numbers. Pipes and redirection receive UTF-8/LF Markdown without added ANSI,
+terminals use centered divider headings for the project name, Git log and Files,
+plus colors and syntax highlighting. They omit Markdown fences and line numbers.
+Pipes and redirection receive UTF-8/LF Markdown without added ANSI,
 regardless of Python's locale encoding. A shell may decode or re-encode redirected
 output; use `-f` for a file with guaranteed UTF-8/no BOM/LF, including in Windows
 PowerShell 5.1.
@@ -463,6 +464,17 @@ interactive. Redirect stderr or use `-P` to suppress it. This is independent of
 `-n`, which controls paging. Feedback is cleared before results or the pager.
 Missing or failing progress components quietly disable feedback; Ctrl+C cleans
 resources and returns 130.
+
+---
+
+### Version
+
+```text
+-v, --version
+```
+
+Print the installed version (for example, `pylistall 2.0.0`) and exit without
+collecting context, copying or writing a file.
 
 ---
 

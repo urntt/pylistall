@@ -36,6 +36,9 @@ arguments -> shared patterns -> one traversal (omit pruning)
 Results remain in memory. Standalone collectors use the same scanner. Title-only
 and title/path-only documents validate the root but do not enumerate directories.
 
+The version action exits during argument parsing, before root validation or
+collection. It reads installed distribution metadata as the version source.
+
 ## Discovery, filtering and links
 
 The explicit resolved root is exempt from include/omit matching. Children are
@@ -118,7 +121,8 @@ kills/waits/closes Git. No destination receives a partial body. Dry-run uses the
 same collection/accounting, reporting only counts, bytes and destinations.
 
 Rich consumes the model directly, without rereading or parsing Markdown, and
-shares language tags. Missing Rich silently falls back. Redirection is ANSI-free
+shares language tags. Project, Git log and Files headings use centered cyan rules
+with literal titles. Missing Rich silently falls back. Redirection is ANSI-free
 Markdown written to the binary stdout stream as UTF-8/no BOM/LF, independent of
 the Python text wrapper's encoding and newline handling; text-only capture streams
 receive the same Markdown string. Shell decoding/re-encoding is outside this

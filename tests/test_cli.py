@@ -14,6 +14,32 @@ def copied(monkeypatch):
     return texts
 
 
+@pytest.mark.parametrize("option", ["-v", "--version"])
+def test_version_exits_without_collecting_or_delivering(
+    tmp_path, monkeypatch, copied, capsys, option
+):
+    requested = []
+
+    def installed_version(name):
+        requested.append(name)
+        return "9.8.7"
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("version must exit before collecting or delivering")
+
+    monkeypatch.setattr(cli, "version", installed_version)
+    monkeypatch.setattr(cli, "_build_output", forbidden)
+    monkeypatch.setattr(cli, "CollectionProgress", forbidden)
+    monkeypatch.setattr(cli, "resolve_destination", forbidden)
+    target = tmp_path / "output.md"
+    with pytest.raises(SystemExit) as caught:
+        cli.main([str(tmp_path / "missing"), "-c", "-f", str(target), option])
+    assert caught.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.out == "pylistall 9.8.7\n" and captured.err == ""
+    assert requested == ["pylistall"] and copied == [] and not target.exists()
+
+
 def test_default_command_uses_current_directory(
     tmp_path, write_file, monkeypatch, copied, capsys
 ):

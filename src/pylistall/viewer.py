@@ -57,7 +57,7 @@ def render_terminal(
             emoji=False,
             legacy_windows=False,
         )
-        console.print(Text(visible_name(document.project_name), style="bold cyan"))
+        console.rule(Text(visible_name(document.project_name)), style="cyan")
         if document.path is not None:
             console.print(Text(visible_name(document.path)))
         if document.tree is not None:
