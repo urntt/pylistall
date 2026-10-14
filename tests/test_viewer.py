@@ -24,7 +24,7 @@ class Terminal(io.StringIO):
 @pytest.fixture
 def document():
     return OutputDocument(
-        "project",
+        "[blue]项目🙂",
         "C:/project/[bold]🙂",
         "└── source.py",
         (),
@@ -34,6 +34,9 @@ def document():
 
 def test_rich_renders_literal_paths_without_fences_or_numbers(document):
     text = viewer.render_terminal(document, width=100, color=False)
+    heading = text.splitlines()[0]
+    assert heading.startswith("─") and heading.endswith("─")
+    assert f" {document.project_name} " in heading
     assert "[bold]🙂" in text and "[red]中文.py" in text
     assert 'print("中文🙂")' in text
     assert "```" not in text and "\x1b" not in text

@@ -66,8 +66,9 @@ pylistall [path] [options]
 
 如果未提供 `path`，则默认使用当前目录（`.`）。
 
-默认展示结果，不操作剪贴板。交互终端使用分组标题、颜色及代码高亮，不显示 Markdown
-围栏或代码行号；管道及重定向输出 UTF-8／LF Markdown，不受 Python 本地编码影响，
+默认展示结果，不操作剪贴板。交互终端将项目名、Git log 和 Files 显示为居中分割线标题，
+使用颜色及代码高亮，不显示 Markdown 围栏或代码行号；
+管道及重定向输出 UTF-8／LF Markdown，不受 Python 本地编码影响，
 不添加 ANSI。Shell 可能解码或重新编码重定向输出；需要保证文件为 UTF-8／无 BOM／LF
 时使用 `-f`，Windows PowerShell 5.1 也适用。状态提示和警告写入 stderr。
 
@@ -430,6 +431,16 @@ Windows 自带程序），再回退系统 `more`。Less 默认 `-FRX`：短输�
 只要 stderr 仍是终端即可显示；重定向 stderr 或使用 `-P` 可关闭。
 此选项与控制分页的 `-n` 独立。正文或分页前先清理进度。
 反馈组件缺失或失效时静默关闭；Ctrl+C 清理资源并返回 130。
+
+---
+
+### 版本
+
+```text
+-v, --version
+```
+
+输出已安装版本（例如 `pylistall 2.0.0`）后退出，不收集上下文、不复制、不写文件。
 
 ---
 

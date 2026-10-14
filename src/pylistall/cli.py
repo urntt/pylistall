@@ -6,6 +6,7 @@ import argparse
 import subprocess
 import sys
 from dataclasses import dataclass
+from importlib.metadata import version
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -209,6 +210,13 @@ def _build_parser() -> argparse.ArgumentParser:
         description=(
             "Display directory context; optionally copy Markdown or save a file."
         ),
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {version('pylistall')}",
+        help="Show the installed version and exit.",
     )
     parser.add_argument(
         "path",
