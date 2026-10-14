@@ -8,6 +8,8 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+## [2.1.0]
+
 ### Added
 
 - Add `-v --version` to print the installed package version and exit without collection.
@@ -15,6 +17,7 @@ Maintainers follow the [release guide](docs/releasing.md).
 ### Changed
 
 - Render the terminal project title as a centered divider, matching Git log and Files.
+- Place Contributing and Releases before License in both READMEs.
 
 ## [2.0.0]
 
