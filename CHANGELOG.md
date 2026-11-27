@@ -8,12 +8,15 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+## [2.2.0]
+
 ### Added
 
 - Add `-F --format {markdown,xml,json}` for every destination. XML uses prompt-oriented
   tags with verbatim bodies; JSON is one indented object for scripts. Budgets, dry-run
   sizes and the largest-entry list follow the selected format, bare `-f` uses the
-  matching suffix, and bare `-o` also omits earlier `.xml` and `.json` outputs.
+  matching suffix, and bare `-o` also omits prior XML and JSON exports that use
+  the default filenames.
   Markdown remains the default.
 - Report a rough token estimate in dry runs and in saved/copied messages, and list
   the five largest Files entries with bytes, share and estimate in dry runs.

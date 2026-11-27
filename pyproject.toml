@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pylistall"
-version = "2.1.0"
-description = "Display directory context with a tree and Git history, or copy and export Markdown."
+version = "2.2.0"
+description = "Display directory context with a tree and Git history, or copy and export Markdown, XML-tagged text, and JSON."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"

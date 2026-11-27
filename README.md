@@ -533,7 +533,7 @@ resources and returns 130.
 -v, --version
 ```
 
-Print the installed version (for example, `pylistall 2.1.0`) and exit without
+Print the installed version (for example, `pylistall 2.2.0`) and exit without
 collecting context, copying or writing a file.
 
 ---
