@@ -403,6 +403,12 @@ Collect accurately and report Markdown UTF-8 bytes, Files entry count, successfu
 collected bodies, discovered entries, skips and destinations on stderr. No body is displayed, nothing is copied, and
 no directories or files are created. Combine with `-c` or `-f` to preview them.
 
+The summary also gives a rough token estimate and lists the five largest Files
+entries with their bytes, share and estimate, so large lock or generated files are
+visible before you copy. The estimate counts four ASCII characters or one other
+character per token; real tokenizers differ by model, so use `-M` for an exact
+limit. Saved and copied messages include the same estimate.
+
 ```bash
 pylistall -r -o -D -c -f context.md
 ```

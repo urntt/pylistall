@@ -18,7 +18,7 @@ from pylistall.destinations import (
     write_output,
 )
 from pylistall.gitlog import GitLogOptions
-from pylistall.names import project_name
+from pylistall.names import project_name, visible_name
 from pylistall.output import (
     ContentBlock,
     MarkdownBuilder,
@@ -26,6 +26,7 @@ from pylistall.output import (
     OutputTooLarge,
     block_markdown,
     empty_group,
+    estimate_tokens,
     group_heading,
     introduction,
     language_for,
@@ -46,6 +47,9 @@ from pylistall.tree import build_tree_text
 from pylistall.util import copy_to_clipboard
 from pylistall.viewer import display
 
+# Dry runs list this many of the largest Files entries.
+LARGEST_ENTRIES = 5
+
 
 @dataclass(frozen=True)
 class OutputResult:
@@ -61,6 +65,47 @@ class OutputResult:
     @property
     def warnings(self) -> tuple[str, ...]:
         return self.document.warnings
+
+    def counts(self) -> str:
+        return (
+            f"files: {self.file_count}; collected: {self.document.collected_count}; "
+            f"~{estimate_tokens(self.text)} tokens (estimate)"
+        )
+
+
+def _largest_entries(document: OutputDocument, total: int) -> list[str]:
+    """Describe the Files entries that contribute the most Markdown."""
+    sized = sorted(
+        (
+            (len(text.encode("utf-8")), estimate_tokens(text), block.title)
+            for block in document.files or ()
+            for text in (block_markdown(block),)
+        ),
+        key=lambda item: (-item[0], item[2]),
+    )
+    return [
+        f"  {visible_name(title)}: {size} bytes ({size / total:.1%}), ~{tokens} tokens"
+        for size, tokens, title in sized[:LARGEST_ENTRIES]
+    ]
+
+
+def _report_dry_run(result: OutputResult, destination: Path | None, copy: bool) -> None:
+    destinations = [f"file: {destination}" if destination is not None else "terminal"]
+    if copy:
+        destinations.append("clipboard")
+    size = len(result.text.encode("utf-8"))
+    document = result.document
+    print(
+        f"Dry run: {size} UTF-8 bytes; ~{estimate_tokens(result.text)} tokens "
+        f"(estimate); files: {result.file_count}; "
+        f"collected: {document.collected_count}; "
+        f"discovered: {document.discovered_count}; "
+        f"skipped entries: {document.skipped_count}; " + "; ".join(destinations),
+        file=sys.stderr,
+    )
+    largest = _largest_entries(document, size)
+    if largest:
+        print("Largest Files entries:", *largest, sep="\n", file=sys.stderr)
 
 
 def _build_output(
@@ -406,29 +451,13 @@ def _main(argv: Sequence[str] | None = None) -> int:
     for warning in result.warnings:
         print(f"Warning: {warning}", file=sys.stderr)
     if args.dry_run:
-        destinations = []
-        if destination is not None:
-            destinations.append(f"file: {destination}")
-        else:
-            destinations.append("terminal")
-        if args.copy:
-            destinations.append("clipboard")
-        print(
-            f"Dry run: {len(result.text.encode('utf-8'))} UTF-8 bytes; "
-            f"files: {result.file_count}; collected: {result.document.collected_count}; "
-            f"discovered: {result.document.discovered_count}; skipped entries: {result.document.skipped_count}; "
-            + "; ".join(destinations),
-            file=sys.stderr,
-        )
+        _report_dry_run(result, destination, args.copy)
         return 0
     failed = False
     if destination is not None:
         try:
             write_output(destination, result.text, args.overwrite)
-            print(
-                f"Saved: {destination} (files: {result.file_count}; collected: {result.document.collected_count})",
-                file=sys.stderr,
-            )
+            print(f"Saved: {destination} ({result.counts()})", file=sys.stderr)
         except OSError as exc:
             failed = True
             print(f"Error: file output failed: {exc}", file=sys.stderr)
@@ -442,10 +471,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
     if args.copy:
         try:
             copy_to_clipboard(result.text)
-            print(
-                f"Copied to clipboard (files: {result.file_count}; collected: {result.document.collected_count})",
-                file=sys.stderr,
-            )
+            print(f"Copied to clipboard ({result.counts()})", file=sys.stderr)
         except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             failed = True
             print(f"Error: clipboard copy failed: {exc}", file=sys.stderr)

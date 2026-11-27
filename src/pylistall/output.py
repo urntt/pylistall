@@ -37,6 +37,16 @@ LANGUAGES = {
 }
 
 
+def estimate_tokens(text: str) -> int:
+    """Estimate tokens as four ASCII characters or one other character each.
+
+    The estimate is provider-neutral and rough: real tokenizers differ by model
+    and content. It compares selections; byte budgets remain the exact limit.
+    """
+    ascii_characters = len(text.encode("ascii", "ignore"))
+    return (ascii_characters + 3) // 4 + len(text) - ascii_characters
+
+
 class OutputTooLarge(Exception):
     """Collection exceeded the complete Markdown delivery budget."""
 

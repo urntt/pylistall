@@ -121,7 +121,10 @@ Base64 blocks have an encoding label. Sections use consistent blank lines and LF
 and truncation. File/Base64/Git chunks check conservative lower bounds, followed
 by exact complete block checks. Excess aborts later processing, closes files and
 kills/waits/closes Git. No destination receives a partial body. Dry-run uses the
-same collection/accounting, reporting only counts, bytes and destinations.
+same collection/accounting, reporting counts, bytes, destinations, a rough token
+estimate and the five largest Files entries by their Markdown bytes. The estimate
+counts four ASCII characters or one other character per token; it is provider-neutral,
+never a budget, and saved/copied messages repeat it.
 
 Rich consumes the model directly, without rereading or parsing Markdown, and
 shares language tags. Project, Git log and Files headings use centered cyan rules

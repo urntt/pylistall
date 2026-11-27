@@ -4,7 +4,13 @@ import pytest
 
 from pylistall import cli, selection
 from pylistall.names import inline_code
-from pylistall.output import render_markdown
+from pylistall.output import (
+    ContentBlock,
+    OutputDocument,
+    block_markdown,
+    estimate_tokens,
+    render_markdown,
+)
 
 
 @pytest.fixture
@@ -184,6 +190,68 @@ def test_exact_budget_and_dry_run(tmp_path, write_file, copied, capsys):
     captured = capsys.readouterr()
     assert captured.out == "" and "exceeds" in captured.err
     assert not target.parent.exists() and not copied
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("", 0), ("abc", 1), ("abcd", 1), ("abcde", 2), ("中文", 2), ("ab中文🙂", 4)],
+)
+def test_token_estimate_counts_ascii_quarters_and_other_characters(text, expected):
+    assert estimate_tokens(text) == expected
+
+
+def test_dry_run_reports_estimate_and_largest_entries(
+    tmp_path, write_file, copied, capsys
+):
+    for index in range(7):
+        write_file(f"file{index}.txt", "x" * (index * 100))
+    assert cli.main([str(tmp_path), "-c"]) == 0
+    text = copied[0]
+    size = len(text.encode("utf-8"))
+    tokens = estimate_tokens(text)
+    assert f"Copied to clipboard (files: 7; collected: 7; ~{tokens} tokens" in (
+        capsys.readouterr().err
+    )
+    copied.clear()
+    assert cli.main([str(tmp_path), "-D"]) == 0
+    lines = capsys.readouterr().err.splitlines()
+    assert lines[0].startswith(
+        f"Dry run: {size} UTF-8 bytes; ~{tokens} tokens (estimate); files: 7;"
+    )
+    assert lines[1] == "Largest Files entries:" and len(lines) == 2 + 5
+    assert [line.split(":")[0].strip() for line in lines[2:]] == [
+        f"file{index}.txt" for index in (6, 5, 4, 3, 2)
+    ]
+    block = block_markdown(ContentBlock("file6.txt", "x" * 600))
+    entry = len(block.encode("utf-8"))
+    assert lines[2] == (
+        f"  file6.txt: {entry} bytes ({entry / size:.1%}), "
+        f"~{estimate_tokens(block)} tokens"
+    )
+    assert copied == []
+
+
+@pytest.mark.parametrize("options", [["-d", "files"], ["-i", "missing.*"]])
+def test_dry_run_without_files_entries_omits_largest_list(
+    tmp_path, write_file, capsys, options
+):
+    write_file("source.py", "source")
+    assert cli.main([str(tmp_path), "-D", *options]) == 0
+    assert "Largest Files entries" not in capsys.readouterr().err
+
+
+def test_largest_entries_escape_names_and_break_ties_by_name():
+    blocks = (
+        ContentBlock("c.txt", "same"),
+        ContentBlock("a.txt", "same"),
+        ContentBlock("e\x1b.txt", "larger body"),
+    )
+    lines = cli._largest_entries(OutputDocument("p", None, None, None, blocks), 1000)
+    assert [line.split(":")[0] for line in lines] == [
+        "  e\\x1b.txt",
+        "  a.txt",
+        "  c.txt",
+    ]
 
 
 def test_streaming_budget_stops_before_later_file(

@@ -8,6 +8,11 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+### Added
+
+- Report a rough token estimate in dry runs and in saved/copied messages, and list
+  the five largest Files entries with bytes, share and estimate in dry runs.
+
 ### Changed
 
 - Compile include, omit and binary rules once and cache resolved ancestor checks.
