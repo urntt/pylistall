@@ -32,29 +32,44 @@
 
 ## 安装
 
-使用 PyPI：
+pylistall 是命令行工具，建议安装在独立的隔离环境中。使用
+[uv](https://docs.astral.sh/uv/getting-started/installation/)（没有可用 Python 时，
+uv 也会自动下载兼容版本）：
 
 ```bash
-python -m pip install pylistall
+uv tool install pylistall
 ```
 
-或者，在项目根目录（包含 `pyproject.toml` 的目录）执行：
+不安装、直接运行一次：
 
 ```bash
-python -m pip install .
+uvx pylistall -r -o
 ```
 
-验证安装：
+或使用 [pipx](https://pipx.pypa.io/)：
 
 ```bash
-pylistall --help
+pipx install pylistall
 ```
 
-卸载：
+安装后找不到 `pylistall` 命令时，运行 `uv tool update-shell` 或 `pipx ensurepath`，
+然后打开新的终端。验证安装：
 
 ```bash
-python -m pip uninstall pylistall
+pylistall --version
 ```
+
+升级或卸载（pipx 使用 `pipx upgrade` 与 `pipx uninstall`）：
+
+```bash
+uv tool upgrade pylistall
+uv tool uninstall pylistall
+```
+
+在已激活的虚拟环境中仍可使用 `python -m pip install pylistall`。许多 Linux 发行版和
+Homebrew 会以 `externally-managed-environment`（[PEP 668](https://peps.python.org/pep-0668/)）
+拒绝向系统 Python 执行 `pip install`；请改用 uv 或 pipx，不要使用
+`--break-system-packages`。从源码目录安装时，在项目根目录运行 `uv tool install .`。
 
 ---
 
@@ -543,7 +558,7 @@ pylistall -r -o -D -M 100000 -c -f context.md
 
 ## 环境要求
 
-Python 3.9 或更高版本；只有收集 Git 历史时才需要 Git。
+Python 3.9 或更高版本，`uv tool install` 与 `uvx` 可自动提供；只有收集 Git 历史时才需要 Git。
 
 ---
 

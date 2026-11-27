@@ -19,6 +19,8 @@
 
 ### 调整
 
+- README 改为推荐 `uv tool install`、`uvx` 与 pipx 安装，pip 仅用于虚拟环境，避免系统
+  Python 上的 `externally-managed-environment` 错误。
 - 包含、排除与二进制规则只编译一次，并缓存解析目标的祖先检查。匹配结果不变；
   在 Linux 上对 20,000 个文件使用裸 `-o` 的基准测试中，完整收集约快 4 倍。
 

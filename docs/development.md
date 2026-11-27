@@ -49,8 +49,9 @@ syntax and standard-library APIs throughout the supported range.
 
 The former, unpublished `dev` extra has been replaced by `[dependency-groups].dev`.
 It contains pytest, Ruff, and Twine and is not exposed as an installation extra.
-Ordinary users continue to install with pip; development tools are not runtime
-dependencies. `uv.lock` records versions and Python/platform-specific resolutions.
+Users install the published wheel as an isolated tool (`uv tool install`, `uvx` or
+pipx, as the README describes); pip remains valid inside a virtual environment.
+Development tools are not runtime dependencies. `uv.lock` records versions and Python/platform-specific resolutions.
 `--locked` rejects a stale lock instead of silently updating it.
 
 ## Run and check changes

@@ -35,29 +35,46 @@ debugging, documentation, or code review.
 
 ## Installation
 
-Using PyPI:
+pylistall is a command-line tool, so install it in its own isolated environment.
+With [uv](https://docs.astral.sh/uv/getting-started/installation/), which also
+downloads a compatible Python when none is available:
 
 ```bash
-python -m pip install pylistall
+uv tool install pylistall
 ```
 
-Or, from the project root (where `pyproject.toml` is located):
+Run it once without installing:
 
 ```bash
-python -m pip install .
+uvx pylistall -r -o
 ```
 
-Verify installation:
+Or use [pipx](https://pipx.pypa.io/):
 
 ```bash
-pylistall --help
+pipx install pylistall
 ```
 
-Uninstall:
+If the `pylistall` command is not found afterwards, run `uv tool update-shell` or
+`pipx ensurepath` and open a new terminal. Verify the installation:
 
 ```bash
-python -m pip uninstall pylistall
+pylistall --version
 ```
+
+Upgrade or uninstall (with pipx: `pipx upgrade` and `pipx uninstall`):
+
+```bash
+uv tool upgrade pylistall
+uv tool uninstall pylistall
+```
+
+`python -m pip install pylistall` remains suitable inside an activated virtual
+environment. Many Linux distributions and Homebrew reject `pip install` into their
+system Python with `externally-managed-environment`
+([PEP 668](https://peps.python.org/pep-0668/)); use uv or pipx instead of
+`--break-system-packages`. To install from a checkout, run `uv tool install .`
+in the project root.
 
 ---
 
@@ -584,7 +601,8 @@ one. Review selected content before sharing; current boundaries are documented i
 
 ## Requirements
 
-Python 3.9 or higher. Git is required only when collecting Git history.
+Python 3.9 or higher; `uv tool install` and `uvx` can provide it. Git is required
+only when collecting Git history.
 
 ---
 

@@ -40,7 +40,7 @@ pylistall 是一个跨平台命令行工具，用于收集目录上下文，默�
 
 ### 依赖
 
-- 运行依赖、开发依赖组和检查配置统一放在 `pyproject.toml`，解析结果提交到 `uv.lock`。用户继续使用 pip；开发使用 uv。保留 setuptools 构建后端，新增运行依赖须有符合轻量 CLI 定位的理由。
+- 运行依赖、开发依赖组和检查配置统一放在 `pyproject.toml`，解析结果提交到 `uv.lock`。用户安装说明以 `uv tool install`、`uvx` 与 pipx 等隔离工具安装为主，pip 仅推荐在虚拟环境中使用；开发使用 uv。保留 setuptools 构建后端，新增运行依赖须有符合轻量 CLI 定位的理由。
 - 不再维护 `dev` extra；依赖变更按[锁文件维护](docs/development.zh-CN.md#锁文件维护)操作，不在验证时静默升级依赖。
 
 ### 开发

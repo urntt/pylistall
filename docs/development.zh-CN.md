@@ -46,7 +46,8 @@ uv 创建 `.venv`，以可编辑方式安装项目，并包含 `dev` 开发依�
 
 此前尚未发布的 `dev` extra 已迁移到 `[dependency-groups].dev`，
 包含 pytest、Ruff 和 Twine，不再作为安装 extra 暴露。
-普通用户继续使用 pip，开发工具不会成为运行依赖。`uv.lock` 记录版本及
+用户按 README 以隔离工具方式安装已发布的 wheel（`uv tool install`、`uvx` 或 pipx），
+在虚拟环境中仍可使用 pip；开发工具不会成为运行依赖。`uv.lock` 记录版本及
 Python、平台条件下的解析结果；`--locked` 会拒绝过时锁文件，不会静默更新。
 
 ## 运行与检查修改
