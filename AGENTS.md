@@ -14,7 +14,7 @@ pylistall 是一个跨平台命令行工具，用于收集目录上下文，默�
 
 ### 结构
 
-- `cli.py` 负责参数、收集与交付编排，`output.py` 负责结构化结果、Markdown 与预算，`destinations.py` 负责文件目的地，`traversal.py` 提供共享遍历，`patterns.py` 统一模式与排除规则，`names.py` 负责安全名称展示，`tree.py` 负责名称视图，`selection.py` 负责候选、分类和结构化读取，`progress.py` 负责收集反馈，`gitlog.py` 负责日志收集，`util.py` 负责剪贴板。维护这些边界，数据流与仓库结构分别见[架构文档](docs/architecture.zh-CN.md)和[开发指南](docs/development.zh-CN.md)。
+- `cli.py` 负责参数、收集与交付编排，`output.py` 负责结构化结果、Markdown/XML/JSON 格式与预算，`destinations.py` 负责文件目的地，`traversal.py` 提供共享遍历，`patterns.py` 统一模式与排除规则，`names.py` 负责安全名称展示，`tree.py` 负责名称视图，`selection.py` 负责候选、分类和结构化读取，`progress.py` 负责收集反馈，`gitlog.py` 负责日志收集，`util.py` 负责剪贴板。维护这些边界，数据流与仓库结构分别见[架构文档](docs/architecture.zh-CN.md)和[开发指南](docs/development.zh-CN.md)。
 
 ### 平台
 
@@ -34,13 +34,13 @@ pylistall 是一个跨平台命令行工具，用于收集目录上下文，默�
 
 ### 行为
 
-- `viewer.py` 消费同一结构化结果提供终端美化与分页；重定向通过二进制 stdout 写规范 UTF-8／LF Markdown，复制和文件复用规范 Markdown。Rich 导入失败静默回退，分页仅在两个流都是终端时启用。遵循 `PAGER` 与 `-n`；`-P` 关闭 stderr 收集与终端排版反馈，反馈不拦截业务流并在正文交付／分页前清理；Ctrl+C 清理资源返回 130，路径及内容不得解释为 Rich 标记；剪贴板模拟不能替代真实终端分页验收。
+- `viewer.py` 消费同一结构化结果提供终端美化与分页；重定向通过二进制 stdout 写所选格式（默认 Markdown）的规范 UTF-8／LF 文本，复制和文件复用同一规范文本；XML／JSON 在终端直接展示规范文本，不经 Rich。Rich 导入失败静默回退，分页仅在两个流都是终端时启用。遵循 `PAGER` 与 `-n`；`-P` 关闭 stderr 收集与终端排版反馈，反馈不拦截业务流并在正文交付／分页前清理；Ctrl+C 清理资源返回 130，路径及内容不得解释为 Rich 标记；剪贴板模拟不能替代真实终端分页验收。
 
-- 用户可观察行为以 [README](README.zh-CN.md) 为说明入口、`tests/` 为回归基线。`-i/-o` 同时筛选树和 Files，完整排除目录提前剪枝，显式根目录豁免；`-o` 优先于 `-i` 和 `-b`，`-i` 不授权二进制正文，`-b` 只允许候选正文使用 Base64；链接默认只显示，`-l` 可跟随根外目标，目录展开还需 `-r`；默认展示，`-c` 额外复制，`-f` 保存并抑制终端正文；项目标题始终存在，`-d path/tree/git/files` 对全部目的地生效且可全部禁用，旧 `root` 报错；禁用部分不读取，只有标题或标题加 path 时不扫描；Git 在未剪枝目录中独立发现；预算超限不交付部分结果。行为修改必须同步测试及双语文档。
+- 用户可观察行为以 [README](README.zh-CN.md) 为说明入口、`tests/` 为回归基线。`-i/-o` 同时筛选树和 Files，完整排除目录提前剪枝，显式根目录豁免；`-o` 优先于 `-i` 和 `-b`，`-i` 不授权二进制正文，`-b` 只允许候选正文使用 Base64；链接默认只显示，`-l` 可跟随根外目标，目录展开还需 `-r`；默认展示，`-c` 额外复制，`-f` 保存并抑制终端正文；`-F` 为全部目的地选择 markdown／xml／json，各格式共用预算与 dry-run 大小；项目标题始终存在，`-d path/tree/git/files` 对全部目的地生效且可全部禁用，旧 `root` 报错；禁用部分不读取，只有标题或标题加 path 时不扫描；Git 在未剪枝目录中独立发现；预算超限不交付部分结果。行为修改必须同步测试及双语文档。
 
 ### 依赖
 
-- 运行依赖、开发依赖组和检查配置统一放在 `pyproject.toml`，解析结果提交到 `uv.lock`。用户继续使用 pip；开发使用 uv。保留 setuptools 构建后端，新增运行依赖须有符合轻量 CLI 定位的理由。
+- 运行依赖、开发依赖组和检查配置统一放在 `pyproject.toml`，解析结果提交到 `uv.lock`。用户安装说明以 `uv tool install`、`uvx` 与 pipx 等隔离工具安装为主，pip 仅推荐在虚拟环境中使用；开发使用 uv。保留 setuptools 构建后端，新增运行依赖须有符合轻量 CLI 定位的理由。
 - 不再维护 `dev` extra；依赖变更按[锁文件维护](docs/development.zh-CN.md#锁文件维护)操作，不在验证时静默升级依赖。
 
 ### 开发

@@ -16,7 +16,7 @@ pylistall/
 ├── CHANGELOG*.md              bilingual version changes
 ├── VISION*.md                 product direction
 ├── docs/                      development and architecture, in both languages
-├── .github/                   CI workflow and bilingual pull request template
+├── .github/                   CI/release workflows, Dependabot and bilingual PR template
 ├── src/pylistall/              CLI, traversal, model/rendering, destinations, selection, Git, clipboard
 ├── tests/                     behavior and regression tests
 ├── scripts/                   unified checks, CI matrix and wheel smoke test
@@ -49,8 +49,9 @@ syntax and standard-library APIs throughout the supported range.
 
 The former, unpublished `dev` extra has been replaced by `[dependency-groups].dev`.
 It contains pytest, Ruff, and Twine and is not exposed as an installation extra.
-Ordinary users continue to install with pip; development tools are not runtime
-dependencies. `uv.lock` records versions and Python/platform-specific resolutions.
+Users install the published wheel as an isolated tool (`uv tool install`, `uvx` or
+pipx, as the README describes); pip remains valid inside a virtual environment.
+Development tools are not runtime dependencies. `uv.lock` records versions and Python/platform-specific resolutions.
 `--locked` rejects a stale lock instead of silently updating it.
 
 ## Run and check changes
@@ -77,7 +78,10 @@ It runs Ruff lint, Ruff format verification, and pytest, in that order, with the
 active Python interpreter. It stops at the first failure and returns a nonzero
 status. The script locates the repository root itself; configuration lives in
 `pyproject.toml`. Ruff targets Python 3.9, uses an 88-character line width, and
-checks `E4`, `E7`, `E9`, `F`, and `I`, including import ordering.
+checks `E4`, `E7`, `E9`, `F`, `I` (import ordering), `UP` (syntax upgrades for the
+minimum Python), `B` (likely bugs), `SIM` (simplifications), `C4` (comprehensions)
+and `RUF`. Source modules use `from __future__ import annotations`, so annotations
+such as `str | None` remain valid on Python 3.9.
 
 Apply intentional formatting and import fixes, then rerun the entry point:
 
@@ -123,6 +127,9 @@ Traversal tests create real links in temporary directories, including Windows
 junctions. Symbolic-link tests skip only when Windows denies the required link
 privilege. They cover external targets, ancestor cycles, repeated aliases,
 broken links, exclusion consistency, and nested enumeration failures.
+Pattern tests compare compiled rule sets and cached ancestor checks with per-rule
+`fnmatch` and the previous ancestor loop, so every CI platform verifies its own
+case and separator normalization.
 
 ### Collection and terminal acceptance
 
@@ -233,6 +240,13 @@ when all dependency updates are in scope. Inspect conditional versions for the
 minimum Python too. `uv lock --check` verifies freshness without accepting changes.
 Do not edit resolved lock entries manually or replace `--locked` with `--frozen`
 to bypass an inconsistent project configuration.
+
+[Dependabot](../.github/dependabot.yml) opens monthly grouped pull requests for
+GitHub Actions and the uv lock, after a seven-day cooldown for new releases. The
+uv entry uses `lockfile-only`, so declared minimum versions in `pyproject.toml`
+stay unchanged. Review these pull requests like any other change and merge only
+after the latest `CI` run passes. The uv version pinned in workflows is not updated
+by Dependabot; change it together with the validated version in this guide.
 
 ## Contribution workflow
 

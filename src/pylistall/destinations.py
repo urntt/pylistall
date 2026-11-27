@@ -6,12 +6,11 @@ import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
-def resolve_destination(raw: Optional[str], cwd: Path) -> Path:
+def resolve_destination(raw: str | None, cwd: Path, suffix: str = ".md") -> Path:
     """Calculate one local timestamp and interpret relative paths from cwd."""
-    name = datetime.now().strftime("pylistall-output-%Y-%m-%d-%H-%M-%S.md")
+    name = datetime.now().strftime("pylistall-output-%Y-%m-%d-%H-%M-%S") + suffix
     path = Path(raw or ".").expanduser()
     if not path.is_absolute():
         path = cwd / path

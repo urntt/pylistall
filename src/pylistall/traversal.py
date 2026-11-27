@@ -6,7 +6,7 @@ import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from pylistall.names import visible_name
 from pylistall.patterns import omitted, target_omitted
@@ -18,11 +18,11 @@ class FilesystemEntry:
 
     path: Path
     relative_path: Path
-    resolved_path: Optional[Path]
+    resolved_path: Path | None
     is_dir: bool
     is_file: bool
     is_link: bool
-    skipped: Optional[str] = None
+    skipped: str | None = None
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ def scan_directory(
     *,
     omit: tuple[str, ...] = (),
     collect_git: bool = True,
-    report: Optional[Callable[..., None]] = None,
+    report: Callable[..., None] | None = None,
 ) -> TraversalResult:
     """Scan iteratively; only the current ancestor chain forbids aliases."""
     root = root.resolve(strict=True)

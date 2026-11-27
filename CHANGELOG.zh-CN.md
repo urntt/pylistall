@@ -8,6 +8,35 @@
 
 ## [Unreleased]
 
+## [2.2.0]
+
+### 新增
+
+- 新增 `-F --format {markdown,xml,json}`，作用于所有目的地。XML 使用面向提示词的标签且正文
+  原样保留；JSON 是供脚本使用的单个缩进对象。预算、dry-run 大小与最大条目列表按所选格式
+  计算，裸 `-f` 使用对应后缀，裸 `-o` 也会排除使用默认文件名的旧 XML 和 JSON 导出。
+  默认仍为 Markdown。
+- dry-run 以及保存、复制提示报告粗略 token 估算；dry-run 另列出占用最大的 5 个 Files
+  条目及其字节数、占比和估算值。
+
+### 调整
+
+- README 改为推荐 `uv tool install`、`uvx` 与 pipx 安装，pip 仅用于虚拟环境，避免系统
+  Python 上的 `externally-managed-environment` 错误。
+- 包含、排除与二进制规则只编译一次，并缓存解析目标的祖先检查。匹配结果不变；
+  在 Linux 上对 20,000 个文件使用裸 `-o` 的基准测试中，完整收集约快 4 倍。
+
+### 修复
+
+- 在 Python 3.9 上检查深层目录的排除规则时，不再触发递归深度错误。
+- 文件系统名称包含孤立代理字符时，可以导出可读的 UTF-8 JSON。
+
+### 开发
+
+- 新增 Dependabot，按月分组更新 GitHub Actions 与 uv 锁文件，冷却七天，uv 只更新锁文件。
+- 启用 Ruff `UP`、`B`、`SIM`、`C4` 与 `RUF` 规则并应用修复，包括仍兼容 Python 3.9 的
+  `X | None` 注解。
+
 ## [2.1.0]
 
 ### 新增

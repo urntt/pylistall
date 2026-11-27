@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from pylistall.traversal import TraversalResult, scan_directory
 
@@ -20,7 +20,7 @@ class GitLogOptions:
     """Options for git log output."""
 
     enabled: bool
-    count: Optional[int]
+    count: int | None
 
 
 @dataclass(frozen=True)
@@ -34,9 +34,9 @@ class GitEntry:
 def _run_git_log(
     repo_root: Path,
     count: int,
-    check_size: Optional[Callable[[int], None]] = None,
+    check_size: Callable[[int], None] | None = None,
     chunk_bytes: int = 4096,
-    report: Optional[Callable[..., None]] = None,
+    report: Callable[..., None] | None = None,
 ) -> str:
     """Read logs in chunks and always reap the process after an early abort."""
     if check_size is not None:
@@ -102,7 +102,7 @@ def _find_git_entries(
     recursive: bool,
     follow_links: bool = False,
     *,
-    snapshot: Optional[TraversalResult] = None,
+    snapshot: TraversalResult | None = None,
 ) -> tuple[list[GitEntry], list[str]]:
     """Discover repositories from the same entries used by the other collectors."""
     if snapshot is None:

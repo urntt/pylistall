@@ -15,7 +15,7 @@ pylistall/
 ├── CHANGELOG*.md              双语版本变更
 ├── VISION*.md                 产品方向
 ├── docs/                      双语开发与架构文档
-├── .github/                   CI 工作流与双语 pull request 模板
+├── .github/                   CI／发布工作流、Dependabot 与双语 PR 模板
 ├── src/pylistall/              CLI、模式、共享遍历、输出、进度、目的地、Git、剪贴板
 ├── tests/                     行为与回归测试
 ├── scripts/                   统一检查、CI 矩阵与 wheel 冒烟验证
@@ -46,7 +46,8 @@ uv 创建 `.venv`，以可编辑方式安装项目，并包含 `dev` 开发依�
 
 此前尚未发布的 `dev` extra 已迁移到 `[dependency-groups].dev`，
 包含 pytest、Ruff 和 Twine，不再作为安装 extra 暴露。
-普通用户继续使用 pip，开发工具不会成为运行依赖。`uv.lock` 记录版本及
+用户按 README 以隔离工具方式安装已发布的 wheel（`uv tool install`、`uvx` 或 pipx），
+在虚拟环境中仍可使用 pip；开发工具不会成为运行依赖。`uv.lock` 记录版本及
 Python、平台条件下的解析结果；`--locked` 会拒绝过时锁文件，不会静默更新。
 
 ## 运行与检查修改
@@ -70,8 +71,10 @@ uv run --locked python scripts/check.py
 
 它依次使用当前 Python 解释器执行 Ruff 规则检查、Ruff 格式检查和 pytest，
 首个失败即停止并返回非零状态。脚本自行定位仓库根目录，配置保存在 `pyproject.toml`。
-Ruff 目标语法为 Python 3.9，行宽为 88，启用 `E4`、`E7`、`E9`、`F`、`I`，
-包含导入排序。
+Ruff 目标语法为 Python 3.9，行宽为 88，启用 `E4`、`E7`、`E9`、`F`、`I`（导入排序）、
+`UP`（按最低 Python 升级语法）、`B`（潜在缺陷）、`SIM`（简化）、`C4`（推导式）和 `RUF`。
+源码模块使用 `from __future__ import annotations`，因此 `str | None` 等注解在
+Python 3.9 上仍然有效。
 
 有意应用格式与导入修复后，重新运行统一入口：
 
@@ -154,6 +157,8 @@ dry-run 摘要本身不是失败。命令后立即检查 `$LASTEXITCODE`：成�
 遍历测试在临时目录创建真实链接，包括 Windows junction。符号链接测试仅在 Windows
 缺少创建链接权限时跳过；覆盖根外目标、祖先循环、重复别名、断链、排除一致性及
 嵌套目录枚举失败，不读取用户的其他项目。
+模式测试把编译后的规则集和缓存的祖先检查与逐条 `fnmatch` 及原祖先循环对照，
+因此每个 CI 平台都会验证自身的大小写与分隔符规范化。
 
 构建后端保持 setuptools。在仓库根目录执行：
 
@@ -207,6 +212,12 @@ uv run --locked python scripts/check.py
 也要检查最低 Python 对应的条件版本。`uv lock --check` 可验证锁文件是否最新，
 不会接受变更。不要手工修改解析条目，也不要用 `--frozen` 替代 `--locked`
 来绕过配置与锁文件不一致的问题。
+
+[Dependabot](../.github/dependabot.yml) 每月为 GitHub Actions 与 uv 锁文件分组提交
+pull request，新版本发布后先冷却七天。uv 条目使用 `lockfile-only`，不修改
+`pyproject.toml` 中声明的最低版本。像其他变更一样审查这些 pull request，最新 `CI`
+通过后才合并。工作流中固定的 uv 版本不由 Dependabot 更新，需与本指南记录的已验证
+版本一起修改。
 
 ## 贡献流程
 

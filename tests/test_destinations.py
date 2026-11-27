@@ -58,7 +58,7 @@ def test_bare_file_uses_invocation_directory(tmp_path, monkeypatch, local_time, 
 def test_parent_creation_encoding_collision_and_overwrite(tmp_path):
     target = tmp_path / "new" / "custom"
     destinations.write_output(target, "中文🙂\n", False)
-    assert target.read_bytes() == "中文🙂\n".encode("utf-8")
+    assert target.read_bytes() == "中文🙂\n".encode()
     with pytest.raises(FileExistsError):
         destinations.write_output(target, "replacement", False)
     destinations.write_output(target, "replacement\n", True)

@@ -5,9 +5,10 @@ from __future__ import annotations
 import base64
 import codecs
 import io
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+from typing import Callable
 
 from pylistall.patterns import (
     flatten_patterns,
@@ -70,7 +71,7 @@ class SelectionOptions:
     recursive: bool
     include: tuple[str, ...]
     omit: tuple[str, ...]
-    max_bytes: Optional[int]
+    max_bytes: int | None
     follow_links: bool = False
 
 
@@ -92,7 +93,7 @@ class SelectedFile:
 
 
 def parse_binary_policy(
-    raw_binary: Optional[str],
+    raw_binary: str | None,
 ) -> BinaryPolicy:
     """Parse '-b/--binary' policy.
 
@@ -102,10 +103,10 @@ def parse_binary_policy(
     - str : binary enabled with whitelist patterns
     """
     if raw_binary is None:
-        return BinaryPolicy(enabled=False, patterns=tuple())
+        return BinaryPolicy(enabled=False, patterns=())
 
     if raw_binary == "":
-        return BinaryPolicy(enabled=True, patterns=tuple())
+        return BinaryPolicy(enabled=True, patterns=())
 
     return BinaryPolicy(enabled=True, patterns=flatten_patterns([raw_binary]))
 
@@ -163,17 +164,17 @@ class ReadResult:
     text: str
     encoding: str
     truncated: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 def read_content(
     path: Path,
-    max_bytes: Optional[int],
-    check_size: Optional[Callable[[int], None]] = None,
+    max_bytes: int | None,
+    check_size: Callable[[int], None] | None = None,
     chunk_bytes: int = 4096,
     *,
     binary: bool = False,
-    report: Optional[Callable[..., None]] = None,
+    report: Callable[..., None] | None = None,
 ) -> ReadResult:
     """Read a raw prefix; stream either UTF-8 replacement text or padded Base64."""
     decoder = io.IncrementalNewlineDecoder(
@@ -230,8 +231,8 @@ def read_content(
 
 def read_text(
     path: Path,
-    max_bytes: Optional[int],
-    check_size: Optional[Callable[[int], None]] = None,
+    max_bytes: int | None,
+    check_size: Callable[[int], None] | None = None,
     chunk_bytes: int = 4096,
 ) -> str:
     """Convenience text reader backed by the single structured reading implementation."""
@@ -277,8 +278,8 @@ def iter_selected_files(
     root: Path,
     selection: SelectionOptions,
     *,
-    snapshot: Optional[TraversalResult] = None,
-    excluded: Optional[Path] = None,
+    snapshot: TraversalResult | None = None,
+    excluded: Path | None = None,
 ) -> Iterator[SelectedFile]:
     """Select name-matching candidates without sampling or expanding contents."""
     if snapshot is None:
@@ -330,8 +331,8 @@ def select_files_for_content(
     root: Path,
     selection: SelectionOptions,
     *,
-    snapshot: Optional[TraversalResult] = None,
-    excluded: Optional[Path] = None,
+    snapshot: TraversalResult | None = None,
+    excluded: Path | None = None,
 ) -> list[SelectedFile]:
     """Materialize selection for callers that need the complete candidate list."""
     return list(

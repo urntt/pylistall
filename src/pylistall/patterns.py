@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import fnmatch
+import functools
 import os
+import re
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, Sequence
+
+# Characters that give fnmatch patterns a meaning beyond exact equality.
+GLOB_CHARACTERS = frozenset("*?[")
+DIRECTORY_CACHE_SIZE = 4096
 
 DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
     # Git
@@ -63,6 +69,8 @@ DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
     "**/*~",
     "**/desktop.ini",
     "**/pylistall-output-*.md",
+    "**/pylistall-output-*.xml",
+    "**/pylistall-output-*.json",
     "**/.env",
     "**/.env.*",
     "**/.envrc",
@@ -95,37 +103,114 @@ def parse_omit_patterns(raw_omit: Sequence[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(defaults + root_patterns + flatten_patterns(raw_omit)))
 
 
+class PatternMatcher:
+    """Match like ``any(fnmatch.fnmatch(target, p) for p in patterns)``, once.
+
+    Patterns and targets are normalized with ``os.path.normcase`` exactly as
+    ``fnmatch.fnmatch`` does. Exact names use a set lookup; the remaining globs
+    share one compiled alternation of ``fnmatch.translate`` expressions.
+    """
+
+    __slots__ = ("expression", "literals")
+
+    def __init__(self, patterns: tuple[str, ...]):
+        normalized = [os.path.normcase(pattern) for pattern in patterns]
+        globs = [p for p in normalized if GLOB_CHARACTERS.intersection(p)]
+        self.literals = frozenset(normalized).difference(globs)
+        self.expression: re.Pattern[str] | None = (
+            re.compile("|".join(f"(?:{fnmatch.translate(p)})" for p in globs))
+            if globs
+            else None
+        )
+
+    def __call__(self, target: str) -> bool:
+        target = os.path.normcase(target)
+        return target in self.literals or (
+            self.expression is not None and self.expression.match(target) is not None
+        )
+
+
+@functools.lru_cache(maxsize=256)
+def compiled(patterns: tuple[str, ...]) -> PatternMatcher:
+    """Reuse one matcher for each distinct rule set during a collection."""
+    return PatternMatcher(patterns)
+
+
 def matches_any(target: str, patterns: Iterable[str]) -> bool:
-    return any(fnmatch.fnmatch(target, pattern) for pattern in patterns)
+    patterns = tuple(patterns)
+    return bool(patterns) and compiled(patterns)(target)
 
 
 def matches_name(name: str, relative: str, patterns: tuple[str, ...]) -> bool:
-    return matches_any(name, patterns) or matches_any(relative, patterns)
+    if not patterns:
+        return False
+    matcher = compiled(patterns)
+    return matcher(name) or matcher(relative)
 
 
 def omitted(
     name: str, relative: str, patterns: tuple[str, ...], *, directory: bool = False
 ) -> bool:
-    return matches_name(name, relative, patterns) or (
-        directory and matches_any(relative + "/", patterns)
-    )
+    if not patterns:
+        return False
+    matcher = compiled(patterns)
+    return matcher(name) or matcher(relative) or (directory and matcher(relative + "/"))
+
+
+def _relative_to_root(path: Path, root: Path) -> str:
+    try:
+        return Path(os.path.relpath(path, root)).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+@functools.lru_cache(maxsize=8)
+def _directory_cache(root: Path, patterns: tuple[str, ...]) -> dict[Path, bool]:
+    """Keep directory results separate for each collection root and rule set."""
+    return {}
+
+
+def _directory_chain_omitted(
+    directory: Path, root: Path, patterns: tuple[str, ...]
+) -> bool:
+    """Walk ancestors iteratively and cache their results for reuse."""
+    cache = _directory_cache(root, patterns)
+    visited = []
+    result = False
+    while directory != root:
+        cached = cache.get(directory)
+        if cached is not None:
+            result = cached
+            break
+        parent = directory.parent
+        if directory == parent:
+            break
+        if len(visited) < DIRECTORY_CACHE_SIZE:
+            visited.append(directory)
+        if omitted(
+            directory.name,
+            _relative_to_root(directory, root),
+            patterns,
+            directory=True,
+        ):
+            result = True
+            break
+        directory = parent
+    if visited:
+        if len(cache) + len(visited) > DIRECTORY_CACHE_SIZE:
+            cache.clear()
+        cache.update(dict.fromkeys(visited, result))
+    return result
 
 
 def target_omitted(
     target: Path, root: Path, patterns: tuple[str, ...], *, directory: bool = False
 ) -> bool:
     """Check the resolved entry and ancestors, exempting the collection root."""
-    if not patterns:
+    if not patterns or target == root or target == target.parent:
         return False
-    current = target
-    is_directory = directory
-    while current != root and current != current.parent:
-        try:
-            relative = Path(os.path.relpath(current, root)).as_posix()
-        except ValueError:
-            relative = current.as_posix()
-        if omitted(current.name, relative, patterns, directory=is_directory):
-            return True
-        current = current.parent
-        is_directory = True
-    return False
+    if omitted(
+        target.name, _relative_to_root(target, root), patterns, directory=directory
+    ):
+        return True
+    return _directory_chain_omitted(target.parent, root, patterns)

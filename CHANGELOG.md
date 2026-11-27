@@ -8,6 +8,39 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+## [2.2.0]
+
+### Added
+
+- Add `-F --format {markdown,xml,json}` for every destination. XML uses prompt-oriented
+  tags with verbatim bodies; JSON is one indented object for scripts. Budgets, dry-run
+  sizes and the largest-entry list follow the selected format, bare `-f` uses the
+  matching suffix, and bare `-o` also omits prior XML and JSON exports that use
+  the default filenames.
+  Markdown remains the default.
+- Report a rough token estimate in dry runs and in saved/copied messages, and list
+  the five largest Files entries with bytes, share and estimate in dry runs.
+
+### Changed
+
+- Recommend `uv tool install`, `uvx` and pipx in the README; pip remains for virtual
+  environments, avoiding `externally-managed-environment` errors on system Pythons.
+- Compile include, omit and binary rules once and cache resolved ancestor checks.
+  Matching is unchanged; in a Linux benchmark with 20,000 files and bare `-o`, a
+  full collection is about 4x faster.
+
+### Fixed
+
+- Keep exclusion checks working in deeply nested directories on Python 3.9.
+- Export readable UTF-8 JSON when filesystem names contain unpaired surrogates.
+
+### Development
+
+- Add Dependabot for GitHub Actions and the uv lock, grouped monthly with a
+  seven-day cooldown and lockfile-only uv updates.
+- Enable Ruff `UP`, `B`, `SIM`, `C4` and `RUF` rules and apply their fixes, including
+  `X | None` annotations that remain compatible with Python 3.9.
+
 ## [2.1.0]
 
 ### Added

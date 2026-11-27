@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import io
 import locale
@@ -12,7 +13,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from pylistall.names import visible_name
 from pylistall.output import BINARY_PLACEHOLDER, GROUPS, TRUNCATED, OutputDocument
@@ -33,8 +34,8 @@ def render_terminal(
     *,
     width: int,
     color: bool,
-    report: Optional[Callable[..., None]] = None,
-) -> Optional[str]:
+    report: Callable[..., None] | None = None,
+) -> str | None:
     """Import Rich lazily; missing Rich or transitive imports silently fall back."""
     try:
         from rich.console import Console
@@ -114,7 +115,7 @@ def _command(args: list[str]) -> PagerCommand:
     return PagerCommand(tuple(args), kind)
 
 
-def choose_pager() -> Optional[PagerCommand]:
+def choose_pager() -> PagerCommand | None:
     """Honor PAGER, then locate less (including Git for Windows), then more."""
     configured = os.environ.get("PAGER")
     if configured is not None:
@@ -178,10 +179,8 @@ def run_pager(text: str, command: PagerCommand) -> bool:
         raise
     finally:
         if process.stdin is not None:
-            try:
+            with contextlib.suppress(BrokenPipeError):
                 process.stdin.close()
-            except BrokenPipeError:
-                pass
     return getattr(process, "returncode", 0) in NORMAL_PAGER_EXIT_CODES
 
 
@@ -211,34 +210,39 @@ def _write_stdout(text: str) -> None:
             with open(os.devnull, "w") as sink:
                 os.dup2(sink.fileno(), descriptor)
         except (OSError, AttributeError, io.UnsupportedOperation):
-            try:
+            with contextlib.suppress(BrokenPipeError):
                 sys.stdout.close()
-            except BrokenPipeError:
-                pass
 
 
 def display(
     document: OutputDocument,
-    markdown: str,
+    canonical: str,
     *,
     no_pager: bool = False,
     no_progress: bool = False,
+    pretty: bool = True,
 ) -> None:
-    """Redirected output stays canonical Markdown and never imports Rich."""
+    """Redirected output stays canonical text and never imports Rich.
+
+    Terminals show the Rich view of the model unless ``pretty`` is false, as for
+    XML and JSON, which page their canonical text unchanged.
+    """
     if not getattr(sys.stdout, "isatty", lambda: False)():
-        _write_stdout(markdown)
+        _write_stdout(canonical)
         return
     interactive = getattr(sys.stdin, "isatty", lambda: False)()
     pager = choose_pager() if interactive and not no_pager else None
-    width = shutil.get_terminal_size(fallback=(88, 24)).columns
-    with CollectionProgress(no_progress) as progress:
-        pretty = render_terminal(
-            document,
-            width=width,
-            color=pager is None or pager.kind == "less",
-            report=progress.update,
-        )
-    text = markdown if pretty is None else pretty
+    rendered = None
+    if pretty:
+        width = shutil.get_terminal_size(fallback=(88, 24)).columns
+        with CollectionProgress(no_progress) as progress:
+            rendered = render_terminal(
+                document,
+                width=width,
+                color=pager is None or pager.kind == "less",
+                report=progress.update,
+            )
+    text = canonical if rendered is None else rendered
     if pager is not None and run_pager(text, pager):
         return
     _write_stdout(text)

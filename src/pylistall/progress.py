@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
-from typing import Optional
 
 from pylistall.names import visible_name
 
@@ -17,7 +17,7 @@ class CollectionProgress:
             and bool(getattr(sys.stderr, "isatty", lambda: False)())
         )
         self.progress = None
-        self.task: Optional[int] = None
+        self.task: int | None = None
         self.stage = ""
         self.counts = {
             "discovered": 0,
@@ -101,10 +101,8 @@ class CollectionProgress:
     def _stop(self) -> None:
         progress, self.progress = self.progress, None
         if progress is not None:
-            try:
+            with contextlib.suppress(Exception):
                 progress.stop()
-            except Exception:
-                pass
 
     def __exit__(self, *args):
         self._stop()

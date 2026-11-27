@@ -8,6 +8,9 @@ from pathlib import PurePath, PureWindowsPath
 
 
 def visible_name(value: str) -> str:
+    # Printable strings contain no control, format or surrogate characters.
+    if value.isprintable():
+        return value
     escapes = {"\n": r"\n", "\r": r"\r", "\t": r"\t", "\x1b": r"\x1b"}
     return "".join(
         escapes.get(char, f"\\u{ord(char):04x}")

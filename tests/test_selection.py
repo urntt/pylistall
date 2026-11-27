@@ -118,7 +118,7 @@ def test_binary_policy_does_not_change_name_candidates(
     [
         ("empty.txt", b"", False),
         ("plain.txt", b"hello\n", False),
-        ("unicode.txt", "中文内容\n".encode("utf-8"), False),
+        ("unicode.txt", "中文内容\n".encode(), False),
         ("nul.txt", b"hello\x00world", True),
         ("raw.txt", b"\xff" * 20, True),
         ("image.png", b"text with a binary extension", True),

@@ -7,8 +7,8 @@
 [中文说明](README.zh-CN.md)
 
 `pylistall` is a cross-platform command-line tool that collects file contents under
-a directory and displays them in a structured format. It can also copy Markdown
-to the system clipboard or export it to a single file.
+a directory and displays them in a structured format. It can also copy Markdown,
+XML-tagged text or JSON to the system clipboard or export it to a single file.
 
 It includes the absolute path and a tree-style directory structure. If the
 directory contains a `.git` repository, it can optionally include the Git commit log.
@@ -21,12 +21,12 @@ debugging, documentation, or code review.
 ## Features
 
 * Display collected context in the terminal by default
-* Copy Markdown to the clipboard or save it to a single file (optional)
+* Copy Markdown, XML or JSON to the clipboard or save it to a single file (optional)
 * Tree-style directory structure and absolute root path
 * Recursive traversal of subdirectories (optional, disabled by default)
 * Include or omit files using glob patterns (optional, filters both the tree and Files)
 * Expand binaries as Base64 and include Git logs (optional, disabled by default)
-* Choose output parts, preview collection, and limit total output size
+* Choose output parts, preview collection with token estimates, and limit total output size
 * Terminal headings, colors, code highlighting, and interactive paging
 * Collection progress and current operations on interactive stderr
 * Cross-platform support: macOS, Windows, and Linux
@@ -35,29 +35,46 @@ debugging, documentation, or code review.
 
 ## Installation
 
-Using PyPI:
+pylistall is a command-line tool, so install it in its own isolated environment.
+With [uv](https://docs.astral.sh/uv/getting-started/installation/), which also
+downloads a compatible Python when none is available:
 
 ```bash
-python -m pip install pylistall
+uv tool install pylistall
 ```
 
-Or, from the project root (where `pyproject.toml` is located):
+Run it once without installing:
 
 ```bash
-python -m pip install .
+uvx pylistall -r -o
 ```
 
-Verify installation:
+Or use [pipx](https://pipx.pypa.io/):
 
 ```bash
-pylistall --help
+pipx install pylistall
 ```
 
-Uninstall:
+If the `pylistall` command is not found afterwards, run `uv tool update-shell` or
+`pipx ensurepath` and open a new terminal. Verify the installation:
 
 ```bash
-python -m pip uninstall pylistall
+pylistall --version
 ```
+
+Upgrade or uninstall (with pipx: `pipx upgrade` and `pipx uninstall`):
+
+```bash
+uv tool upgrade pylistall
+uv tool uninstall pylistall
+```
+
+`python -m pip install pylistall` remains suitable inside an activated virtual
+environment. Many Linux distributions and Homebrew reject `pip install` into their
+system Python with `externally-managed-environment`
+([PEP 668](https://peps.python.org/pep-0668/)); use uv or pipx instead of
+`--break-system-packages`. To install from a checkout, run `uv tool install .`
+in the project root.
 
 ---
 
@@ -72,7 +89,7 @@ If `[path]` is not provided, the current directory (`.`) is used.
 By default, the result is displayed without changing the clipboard. Interactive
 terminals use centered divider headings for the project name, Git log and Files,
 plus colors and syntax highlighting. They omit Markdown fences and line numbers.
-Pipes and redirection receive UTF-8/LF Markdown without added ANSI,
+Pipes and redirection receive UTF-8/LF Markdown (or the `-F` format) without added ANSI,
 regardless of Python's locale encoding. A shell may decode or re-encode redirected
 output; use `-f` for a file with guaranteed UTF-8/no BOM/LF, including in Windows
 PowerShell 5.1.
@@ -157,7 +174,7 @@ Recursively include subdirectories. When enabled:
 -c, --copy
 ```
 
-Additionally copy the complete Markdown to the clipboard. The terminal still
+Additionally copy the complete output to the clipboard. The terminal still
 displays the result unless `-f` is supplied. Only this option needs a working
 clipboard backend.
 
@@ -172,12 +189,12 @@ clipboard backend.
 ```
 
 Save all enabled output parts to one file and suppress the terminal body.
-Combine with `-c` to save and copy the same Markdown.
+Combine with `-c` to save and copy the same output.
 
 Destination rules:
 
 * Bare `-f` saves in the **command's current directory** using local time:
-  `pylistall-output-%Y-%m-%d-%H-%M-%S.md`.
+  `pylistall-output-%Y-%m-%d-%H-%M-%S.md` (`.xml` or `.json` with `-F`).
 * Relative paths use that same current directory, independently of the collection
   root. Absolute paths and `~` are supported.
 * An existing directory or trailing platform separator selects a directory with
@@ -215,6 +232,42 @@ failure cleans the incomplete file and preserves the original.
 
 ```bash
 pylistall -r -o -f context.md -w
+```
+
+---
+
+### Choose the output format
+
+**Optional; Markdown by default.**
+
+```text
+-F, --format {markdown,xml,json}
+```
+
+Select the format that every destination receives: terminal, redirection, `-f`
+and `-c`. All formats contain the same enabled parts, omit disabled parts, use
+UTF-8/LF, and share `-M` budgets and dry-run sizes.
+
+* `markdown` → the Markdown shown in [Output Format](#output-format). Interactive
+  terminals display its formatted view.
+* `xml` → XML-style tags for AI prompts: `<project name="…">`, `<path>`, `<tree>`,
+  `<git_log>` with `<repository path="…">`, and `<files>` with `<file path="…">`.
+  Attribute values are escaped, but bodies are inserted verbatim, so the result is
+  not guaranteed to be well-formed XML. Base64 bodies use `encoding="base64"`;
+  `truncated`, `binary` and `error` attributes mark truncation, unexpanded binaries
+  and read failures.
+* `json` → one object indented by two spaces, with `project`, `path`, `tree`,
+  `git` (`path`, `log`) and `files` (`path`, `language`, `encoding`, `truncated`,
+  `error`, `content`). `content` is `null` for an unexpanded binary. Use this
+  format for scripts and parsers. If a name contains an unpaired surrogate,
+  the parsed JSON shows a visible escape such as `\udcff` in its place.
+
+XML and JSON are displayed or paged as their canonical text, without colors.
+Bare `-f` uses a `.xml` or `.json` extension for them.
+
+```bash
+pylistall -r -o -F xml -c
+pylistall -r -o -F json -f
 ```
 
 ---
@@ -283,7 +336,8 @@ Bare `-o` enables the default set at the root and nested levels:
 * Frontend: `.next`, `.nuxt`, `.output`, `.svelte-kit`, `.turbo`, `.parcel-cache`,
   `.vite`, `coverage`, `.nyc_output`, `*.tsbuildinfo`, `.eslintcache`, `.stylelintcache`.
 * Other generated files: `.cache`, `target`, `.gradle`, `.vs`, `*.swp`, `*.swo`,
-  `*~`, `desktop.ini`, `pylistall-output-*.md`.
+  `*~`, `desktop.ini`, `pylistall-output-*.md`, `pylistall-output-*.xml`,
+  `pylistall-output-*.json`.
 * Sensitive names: `.env`, `.env.*`, `.envrc`, `.pypirc`, `.netrc`, `id_rsa`,
   `id_dsa`, `id_ecdsa`, `id_ed25519`, `*.key`, `*.pem`, `*.p12`, `*.pfx`,
   `.aws/credentials`, `.streamlit/secrets.toml`.
@@ -399,9 +453,15 @@ An explicitly supplied root link is resolved even without this option.
 -D, --dry-run
 ```
 
-Collect accurately and report Markdown UTF-8 bytes, Files entry count, successfully
+Collect accurately and report output UTF-8 bytes, Files entry count, successfully
 collected bodies, discovered entries, skips and destinations on stderr. No body is displayed, nothing is copied, and
 no directories or files are created. Combine with `-c` or `-f` to preview them.
+
+The summary also gives a rough token estimate and lists the five largest Files
+entries with their bytes, share and estimate, so large lock or generated files are
+visible before you copy. The estimate counts four ASCII characters or one other
+character per token; real tokenizers differ by model, so use `-M` for an exact
+limit. Saved and copied messages include the same estimate.
 
 ```bash
 pylistall -r -o -D -c -f context.md
@@ -417,11 +477,11 @@ pylistall -r -o -D -c -f context.md
 -M, --max-output-bytes N
 ```
 
-Set a positive UTF-8 byte budget for the complete enabled Markdown, including
-headings, encoding labels, fences and newlines. Colors, progress, summaries and
+Set a positive UTF-8 byte budget for the complete enabled output in the selected
+format, including headings, tags, encoding labels, fences and newlines. Colors, progress, summaries and
 status messages do not count. This budget is not a total memory limit.
 Exceeding the budget returns 1 and delivers no partial terminal body, clipboard
-content or file. Dry-run reports the same size as actual Markdown.
+content or file. Dry-run reports the same size as the actual output.
 
 ---
 
@@ -442,7 +502,7 @@ Configured commands use executable/arguments without shell expansion.
 Missing or failed pagers display directly. More receives plain platform-encoded
 text; characters unavailable in the current Windows codepage may be replaced.
 Rich import failures silently fall back to Markdown. Clipboard and file outputs
-always remain Markdown. See [Git's pager defaults](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager).
+always receive the canonical text of the selected format. See [Git's pager defaults](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager).
 
 ---
 
@@ -473,7 +533,7 @@ resources and returns 130.
 -v, --version
 ```
 
-Print the installed version (for example, `pylistall 2.1.0`) and exit without
+Print the installed version (for example, `pylistall 2.2.0`) and exit without
 collecting context, copying or writing a file.
 
 ---
@@ -542,7 +602,8 @@ one. Review selected content before sharing; current boundaries are documented i
 
 ## Requirements
 
-Python 3.9 or higher. Git is required only when collecting Git history.
+Python 3.9 or higher; `uv tool install` and `uvx` can provide it. Git is required
+only when collecting Git history.
 
 ---
 

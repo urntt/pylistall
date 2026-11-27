@@ -10,7 +10,8 @@ behavior and boundaries, and [development](docs/development.md) for the workflow
 
 pylistall helps developers share a small project's context with an AI assistant,
 reviewer, or collaborator. One local command collects a directory tree, selected
-file contents, and optional Git history into Markdown ready to inspect, save or copy.
+file contents, and optional Git history into Markdown, XML-tagged text or JSON ready
+to inspect, save or copy.
 The recipient should be able to understand where files live and read their contents
 without opening each file separately.
 
@@ -37,7 +38,7 @@ The CLI produces an always-visible project title, a combined path/tree block,
 file content blocks and optional independent Git logs. Name inclusion/omission
 filters tree and Files consistently, with early directory pruning. Binary body
 permission is separate and authorized bytes use Base64. Output parts, raw per-file
-limits, exact Markdown budgets and dry-run remain available. Collection progress
+limits, exact output budgets and dry-run remain available. Collection progress
 and terminal formatting feedback use stderr independently of paging. The
 [architecture document](docs/architecture.md) describes actual rules and limitations.
 
@@ -62,7 +63,7 @@ These are future requirements, not current guarantees:
 1. Refine omissions and diagnostics using real collection cases; keep the limits
    of name-based sensitive-file filtering explicit.
 2. Improve memory use for very large directory indexes and collections while
-   retaining exact Markdown accounting and useful terminal feedback.
+   retaining exact output accounting and useful terminal feedback.
 3. Refine filtering and everyday usability using real projects and regression
    evidence, with explicit migration notes for behavior changes.
 
