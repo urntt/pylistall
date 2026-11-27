@@ -20,15 +20,14 @@ from pylistall.destinations import (
 from pylistall.gitlog import GitLogOptions
 from pylistall.names import project_name, visible_name
 from pylistall.output import (
+    FORMATS,
+    MARKDOWN,
     ContentBlock,
-    MarkdownBuilder,
+    OutputBuilder,
     OutputDocument,
+    OutputFormat,
     OutputTooLarge,
-    block_markdown,
-    empty_group,
     estimate_tokens,
-    group_heading,
-    introduction,
     language_for,
 )
 from pylistall.patterns import flatten_patterns, parse_omit_patterns
@@ -53,10 +52,11 @@ LARGEST_ENTRIES = 5
 
 @dataclass(frozen=True)
 class OutputResult:
-    """One collection, canonical Markdown, and destination-independent metadata."""
+    """One collection, its canonical text, and destination-independent metadata."""
 
     text: str
     document: OutputDocument
+    output_format: OutputFormat = MARKDOWN
 
     @property
     def file_count(self) -> int:
@@ -73,13 +73,15 @@ class OutputResult:
         )
 
 
-def _largest_entries(document: OutputDocument, total: int) -> list[str]:
-    """Describe the Files entries that contribute the most Markdown."""
+def _largest_entries(
+    document: OutputDocument, total: int, output_format: OutputFormat = MARKDOWN
+) -> list[str]:
+    """Describe the Files entries that contribute the most output."""
     sized = sorted(
         (
             (len(text.encode("utf-8")), estimate_tokens(text), block.title)
-            for block in document.files or ()
-            for text in (block_markdown(block),)
+            for index, block in enumerate(document.files or ())
+            for text in (output_format.entry("files", block, index),)
         ),
         key=lambda item: (-item[0], item[2]),
     )
@@ -103,7 +105,7 @@ def _report_dry_run(result: OutputResult, destination: Path | None, copy: bool) 
         f"skipped entries: {document.skipped_count}; " + "; ".join(destinations),
         file=sys.stderr,
     )
-    largest = _largest_entries(document, size)
+    largest = _largest_entries(document, size, result.output_format)
     if largest:
         print("Largest Files entries:", *largest, sep="\n", file=sys.stderr)
 
@@ -118,14 +120,16 @@ def _build_output(
     maximum: int | None = None,
     excluded: Path | None = None,
     report: Callable[..., None] | None = None,
+    output_format: OutputFormat = MARKDOWN,
 ) -> OutputResult:
     """Collect enabled parts once, checking budgets before any delivery."""
+    fmt = output_format
     root = root.resolve(strict=True)
     name = project_name(root)
-    builder = MarkdownBuilder(maximum)
+    builder = OutputBuilder(maximum, fmt)
     path_text = str(root) if "path" not in disabled else None
     # Reject an impossible title budget before enumerating the filesystem.
-    builder.check(len(introduction(name, path_text, None).encode("utf-8")))
+    builder.check(len((fmt.start(name, path_text, None) + fmt.end()).encode("utf-8")))
     collect_git = git_options.enabled and "git" not in disabled
     need_scan = "tree" not in disabled or "files" not in disabled or collect_git
     snapshot = (
@@ -154,12 +158,12 @@ def _build_output(
             include=selection.include,
             report=report,
         )
-    builder.append(introduction(name, path_text, tree_text))
+    builder.append(fmt.start(name, path_text, tree_text))
     chunk_bytes = min(4096, maximum + 1) if maximum is not None else 4096
     if collect_git:
         if report is not None:
             report("git", str(root))
-        builder.append(group_heading("git"))
+        builder.append(fmt.group_start("git"))
         logs = []
         entries, _ = gitlog._find_git_entries(
             root, selection.recursive, snapshot=snapshot
@@ -171,17 +175,18 @@ def _build_output(
             text = gitlog._run_git_log(
                 entry.git_path.parent,
                 gitlog.GIT_LOG_ALL if git_options.count is None else git_options.count,
-                check_size=builder.body_checker(title, "text"),
+                check_size=builder.body_checker(title, "text", part="git"),
                 chunk_bytes=chunk_bytes,
                 report=report,
             )
             block = ContentBlock(title, text)
-            builder.append(block_markdown(block))
+            builder.append(fmt.entry("git", block, len(logs)))
             logs.append(block)
         if not logs:
-            builder.append(empty_group("git"))
+            builder.append(fmt.group_empty("git"))
+        builder.append(fmt.group_end("git", len(logs)))
     if "files" not in disabled:
-        builder.append(group_heading("files"))
+        builder.append(fmt.group_start("files"))
         files = []
         candidates = list(
             iter_selected_files(root, selection, snapshot=snapshot, excluded=excluded)
@@ -221,7 +226,7 @@ def _build_output(
                     result.error,
                 )
                 collected += int(result.error is None)
-            builder.append(block_markdown(block))
+            builder.append(fmt.entry("files", block, len(files)))
             files.append(block)
             checked += 1
             if report is not None:
@@ -232,7 +237,9 @@ def _build_output(
                     collected=collected,
                 )
         if not files:
-            builder.append(empty_group("files"))
+            builder.append(fmt.group_empty("files"))
+        builder.append(fmt.group_end("files", len(files)))
+    builder.append(fmt.end())
     document = OutputDocument(
         project_name=name,
         path=path_text,
@@ -246,7 +253,7 @@ def _build_output(
         checked_count=checked,
         collected_count=collected,
     )
-    return OutputResult(builder.text(), document)
+    return OutputResult(builder.text(), document, fmt)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -254,7 +261,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pylistall",
         description=(
-            "Display directory context; optionally copy Markdown or save a file."
+            "Display directory context; optionally copy or save Markdown, XML or JSON."
         ),
     )
     parser.add_argument(
@@ -347,7 +354,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "-c", "--copy", action="store_true", help="Also copy Markdown to the clipboard."
+        "-c",
+        "--copy",
+        action="store_true",
+        help="Also copy the output to the clipboard.",
     )
     parser.add_argument(
         "-f",
@@ -356,7 +366,7 @@ def _build_parser() -> argparse.ArgumentParser:
         const="",
         default=None,
         metavar="DEST",
-        help="Save Markdown to a file instead of displaying the body.",
+        help="Save the output to a file instead of displaying the body.",
     )
     parser.add_argument(
         "-w",
@@ -383,7 +393,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--max-output-bytes",
         type=int,
         metavar="N",
-        help="Limit the complete Markdown UTF-8 byte size.",
+        help="Limit the complete output UTF-8 byte size.",
+    )
+    parser.add_argument(
+        "-F",
+        "--format",
+        choices=tuple(FORMATS),
+        default=MARKDOWN.name,
+        help="Output format for every destination (default: markdown).",
     )
     parser.add_argument(
         "-n", "--no-pager", action="store_true", help="Disable interactive paging."
@@ -426,7 +443,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
     destination = None
     try:
         if args.file is not None:
-            destination = resolve_destination(args.file, Path.cwd())
+            destination = resolve_destination(
+                args.file, Path.cwd(), FORMATS[args.format].suffix
+            )
             validate_destination(destination, args.overwrite)
         with CollectionProgress(args.no_progress) as progress:
             result = _build_output(
@@ -444,6 +463,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 maximum=args.max_output_bytes,
                 excluded=destination,
                 report=progress.update,
+                output_format=FORMATS[args.format],
             )
     except (OSError, RuntimeError, OutputTooLarge) as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -467,6 +487,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             result.text,
             no_pager=args.no_pager,
             no_progress=args.no_progress,
+            pretty=result.output_format is MARKDOWN,
         )
     if args.copy:
         try:

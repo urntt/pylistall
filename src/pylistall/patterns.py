@@ -68,6 +68,8 @@ DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
     "**/*~",
     "**/desktop.ini",
     "**/pylistall-output-*.md",
+    "**/pylistall-output-*.xml",
+    "**/pylistall-output-*.json",
     "**/.env",
     "**/.env.*",
     "**/.envrc",

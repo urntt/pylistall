@@ -216,26 +216,33 @@ def _write_stdout(text: str) -> None:
 
 def display(
     document: OutputDocument,
-    markdown: str,
+    canonical: str,
     *,
     no_pager: bool = False,
     no_progress: bool = False,
+    pretty: bool = True,
 ) -> None:
-    """Redirected output stays canonical Markdown and never imports Rich."""
+    """Redirected output stays canonical text and never imports Rich.
+
+    Terminals show the Rich view of the model unless ``pretty`` is false, as for
+    XML and JSON, which page their canonical text unchanged.
+    """
     if not getattr(sys.stdout, "isatty", lambda: False)():
-        _write_stdout(markdown)
+        _write_stdout(canonical)
         return
     interactive = getattr(sys.stdin, "isatty", lambda: False)()
     pager = choose_pager() if interactive and not no_pager else None
-    width = shutil.get_terminal_size(fallback=(88, 24)).columns
-    with CollectionProgress(no_progress) as progress:
-        pretty = render_terminal(
-            document,
-            width=width,
-            color=pager is None or pager.kind == "less",
-            report=progress.update,
-        )
-    text = markdown if pretty is None else pretty
+    rendered = None
+    if pretty:
+        width = shutil.get_terminal_size(fallback=(88, 24)).columns
+        with CollectionProgress(no_progress) as progress:
+            rendered = render_terminal(
+                document,
+                width=width,
+                color=pager is None or pager.kind == "less",
+                report=progress.update,
+            )
+    text = canonical if rendered is None else rendered
     if pager is not None and run_pager(text, pager):
         return
     _write_stdout(text)

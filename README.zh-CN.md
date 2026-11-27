@@ -7,7 +7,7 @@
 [English](README.md)
 
 `pylistall` 是一个跨平台命令行工具，用于收集指定目录下的文件内容，并以结构化格式
-展示结果。它也可以将 Markdown 复制到系统剪贴板或导出为单个文件。
+展示结果。它也可以将 Markdown、XML 标签文本或 JSON 复制到系统剪贴板或导出为单个文件。
 
 输出包含绝对路径和树状目录结构。如果目录包含 `.git` 仓库，还可以选择附加 Git 提交日志。
 
@@ -18,12 +18,12 @@
 ## 功能特性
 
 * 默认在终端展示收集到的上下文
-* 复制 Markdown 到剪贴板或保存为单文件（可选）
+* 复制 Markdown、XML 或 JSON 到剪贴板或保存为单文件（可选）
 * 树状目录结构与绝对根路径
 * 递归遍历子目录（可选，默认禁用）
 * glob 模式包含或排除文件（可选，同时筛选目录树与 Files）
 * 将二进制展开为 Base64 与包含 Git 日志（可选，默认禁用）
-* 选择输出部分、预览收集结果及限制输出总量
+* 选择输出部分、预览收集结果（含 token 估算）及限制输出总量
 * 终端分组标题、颜色、代码高亮与交互分页
 * 在交互 stderr 显示收集进度与当前操作
 * 跨平台支持：macOS、Windows、Linux
@@ -68,7 +68,7 @@ pylistall [path] [options]
 
 默认展示结果，不操作剪贴板。交互终端将项目名、Git log 和 Files 显示为居中分割线标题，
 使用颜色及代码高亮，不显示 Markdown 围栏或代码行号；
-管道及重定向输出 UTF-8／LF Markdown，不受 Python 本地编码影响，
+管道及重定向输出 UTF-8／LF Markdown（或 `-F` 选择的格式），不受 Python 本地编码影响，
 不添加 ANSI。Shell 可能解码或重新编码重定向输出；需要保证文件为 UTF-8／无 BOM／LF
 时使用 `-f`，Windows PowerShell 5.1 也适用。状态提示和警告写入 stderr。
 
@@ -150,7 +150,7 @@ print("Hello World!")
 -c, --copy
 ```
 
-额外复制完整 Markdown。除非同时使用 `-f`，终端仍展示结果。
+额外复制完整输出。除非同时使用 `-f`，终端仍展示结果。
 只有此选项需要可用的剪贴板后端。
 
 ---
@@ -163,12 +163,12 @@ print("Hello World!")
 -f, --file [DEST]
 ```
 
-将所有启用部分保存为单文件，不展示终端正文。可与 `-c` 组合，保存并复制同一份 Markdown。
+将所有启用部分保存为单文件，不展示终端正文。可与 `-c` 组合，保存并复制同一份输出。
 
 目的地规则：
 
 * 裸 `-f` 保存到**命令执行目录**，使用本地时间文件名
-  `pylistall-output-%Y-%m-%d-%H-%M-%S.md`。
+  `pylistall-output-%Y-%m-%d-%H-%M-%S.md`（配合 `-F` 时为 `.xml` 或 `.json`）。
 * 相对路径从同一个命令执行目录计算，独立于收集根目录；支持绝对路径与 `~`。
 * 已有目录或以平台路径分隔符结尾的参数使用该目录加默认名称；其他参数是完整文件名。
 * 自定义名称不自动添加扩展名。
@@ -202,6 +202,37 @@ pylistall -r -o -f ../exports/context -c
 
 ```bash
 pylistall -r -o -f context.md -w
+```
+
+---
+
+### 选择输出格式
+
+**可选，默认 Markdown。**
+
+```text
+-F, --format {markdown,xml,json}
+```
+
+选择所有目的地收到的格式：终端、重定向、`-f` 与 `-c`。各格式包含相同的启用部分，
+不包含禁用部分，使用 UTF-8／LF，并共用 `-M` 预算与 dry-run 大小。
+
+* `markdown` → [输出格式](#输出格式)中展示的 Markdown；交互终端显示其美化视图。
+* `xml` → 面向 AI 提示词的 XML 风格标签：`<project name="…">`、`<path>`、`<tree>`、
+  含 `<repository path="…">` 的 `<git_log>`，以及含 `<file path="…">` 的 `<files>`。
+  属性值会转义，但正文原样插入，因此结果不保证是格式良好的 XML。Base64 正文标注
+  `encoding="base64"`；`truncated`、`binary` 与 `error` 属性分别标记截断、未展开的
+  二进制文件和读取失败。
+* `json` → 以两个空格缩进的单个对象，包含 `project`、`path`、`tree`、`git`（`path`、
+  `log`）与 `files`（`path`、`language`、`encoding`、`truncated`、`error`、`content`）。
+  未展开的二进制文件 `content` 为 `null`。脚本与解析器请使用此格式。
+
+XML 与 JSON 在终端按规范文本直接展示或分页，不加颜色；裸 `-f` 对它们使用 `.xml` 或
+`.json` 扩展名。
+
+```bash
+pylistall -r -o -F xml -c
+pylistall -r -o -F json -f
 ```
 
 ---
@@ -267,7 +298,8 @@ pylistall -d path,tree -d git -c
 * 前端：`.next`、`.nuxt`、`.output`、`.svelte-kit`、`.turbo`、`.parcel-cache`、
   `.vite`、`coverage`、`.nyc_output`、`*.tsbuildinfo`、`.eslintcache`、`.stylelintcache`。
 * 其他生成文件：`.cache`、`target`、`.gradle`、`.vs`、`*.swp`、`*.swo`、`*~`、
-  `desktop.ini`、`pylistall-output-*.md`。
+  `desktop.ini`、`pylistall-output-*.md`、`pylistall-output-*.xml`、
+  `pylistall-output-*.json`。
 * 敏感名称：`.env`、`.env.*`、`.envrc`、`.pypirc`、`.netrc`、`id_rsa`、`id_dsa`、
   `id_ecdsa`、`id_ed25519`、`*.key`、`*.pem`、`*.p12`、`*.pfx`、
   `.aws/credentials`、`.streamlit/secrets.toml`。
@@ -375,7 +407,7 @@ pylistall -i "*.py" -b "*.png"  # 不额外加入 PNG 候选
 -D, --dry-run
 ```
 
-准确收集后向 stderr 报告 Markdown UTF-8 大小、Files 条目数、实际收集数、已发现条目、跳过数及目的地。
+准确收集后向 stderr 报告输出的 UTF-8 大小、Files 条目数、实际收集数、已发现条目、跳过数及目的地。
 不展示正文、不复制、不创建目录或文件。可与 `-c`、`-f` 组合预览目的地。
 
 摘要还会给出粗略的 token 估算，并列出占用最大的 5 个 Files 条目及其字节数、占比和估算值，
@@ -396,9 +428,9 @@ pylistall -r -o -D -c -f context.md
 -M, --max-output-bytes N
 ```
 
-为全部启用部分生成的 Markdown 设置正整数 UTF-8 字节预算，包含标题、编码说明、围栏及换行。
+为全部启用部分按所选格式生成的输出设置正整数 UTF-8 字节预算，包含标题、标签、编码说明、围栏及换行。
 不计算颜色、进度、摘要和状态提示；此预算不等于总内存限制。超限返回 1，不交付部分终端正文、剪贴板内容或文件。
-dry-run 的大小与实际 Markdown 一致。
+dry-run 的大小与实际输出一致。
 
 ---
 
@@ -415,7 +447,7 @@ Windows 自带程序），再回退系统 `more`。Less 默认 `-FRX`：短输�
 `/` 搜索，`q` 退出。空 `PAGER` 也会关闭分页；配置命令拆为程序与参数，不执行 shell 展开。
 
 没有分页器或启动失败时直接展示。More 使用无颜色的平台编码，当前 Windows 代码页无法
-表示的字符可能被替换。Rich 导入失败静默回退 Markdown；复制和文件始终保持 Markdown。
+表示的字符可能被替换。Rich 导入失败静默回退 Markdown；复制和文件始终使用所选格式的规范文本。
 参考 [Git 分页默认值](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corepager)。
 
 ---

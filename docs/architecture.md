@@ -17,7 +17,7 @@ future requirements in the [vision](../VISION.md), and contributor commands in
 | `selection.py` | Metadata candidates, one binary classification, structured chunked reads |
 | `names.py` | Visible control characters, inline code delimiters and project names |
 | `gitlog.py` | Consume private Git entries and stream subprocess output |
-| `output.py` | Structured result, language identifiers, Markdown and exact budget |
+| `output.py` | Structured result, language identifiers, Markdown/XML/JSON formats and exact budget |
 | `progress.py` | Optional isolated Rich collection and terminal formatting feedback |
 | `destinations.py` | Resolve file destinations and perform transactional writes |
 | `viewer.py` | Literal Rich rendering from the model and pager transport |
@@ -29,7 +29,7 @@ arguments -> shared patterns -> one traversal (omit pruning)
                                   |-> private Git markers -> Git chunks
                                   |-> metadata candidates -> classification -> read chunks
              optional callbacks -> progress on stderr
-             cli -> project + path/tree + Git + Files -> model / Markdown budget
+             cli -> project + path/tree + Git + Files -> model / format budget
              stop progress -> warnings -> summary or display/file/copy
 ```
 
@@ -117,27 +117,41 @@ characters have visible escapes. Delimiters grow beyond backtick runs and use
 padding when needed. Body fences are at least three backticks and avoid collisions.
 Base64 blocks have an encoding label. Sections use consistent blank lines and LF.
 
-`MarkdownBuilder` counts final UTF-8 bytes, including titles, labels, dynamic fences
-and truncation. File/Base64/Git chunks check conservative lower bounds, followed
+`-F` selects one output format for every destination. A format renders the model
+as ordered pieces (start, group start, entries, empty marker, group end, end) whose
+concatenation is the canonical text, so collection and `render()` agree exactly.
+Disabled parts are absent in every format. XML uses tags with escaped attribute
+values and verbatim bodies; it targets prompts and is not guaranteed to be
+well-formed XML. JSON pieces equal `json.dumps(indent=2, ensure_ascii=False)` plus a
+final newline; entries are indented at structural newlines only, because strings
+escape theirs while `str.splitlines()` would also split on U+2028 and similar.
+
+`OutputBuilder` counts final UTF-8 bytes in the selected format, including titles,
+tags, labels, dynamic fences and truncation. Each format supplies a lower bound for
+an entry before its body: Markdown and XML allow one saved separator newline, and
+JSON uses its smallest metadata because escaping never shrinks a body.
+File/Base64/Git chunks check these conservative lower bounds, followed
 by exact complete block checks. Excess aborts later processing, closes files and
 kills/waits/closes Git. No destination receives a partial body. Dry-run uses the
 same collection/accounting, reporting counts, bytes, destinations, a rough token
-estimate and the five largest Files entries by their Markdown bytes. The estimate
+estimate and the five largest Files entries by their bytes in the selected format. The estimate
 counts four ASCII characters or one other character per token; it is provider-neutral,
 never a budget, and saved/copied messages repeat it.
 
 Rich consumes the model directly, without rereading or parsing Markdown, and
 shares language tags. Project, Git log and Files headings use centered cyan rules
-with literal titles. Missing Rich silently falls back. Redirection is ANSI-free
-Markdown written to the binary stdout stream as UTF-8/no BOM/LF, independent of
-the Python text wrapper's encoding and newline handling; text-only capture streams
-receive the same Markdown string. Shell decoding/re-encoding is outside this
+with literal titles. Missing Rich silently falls back. XML and JSON skip Rich and
+the `render` stage; terminals display or page their canonical text. Redirection is
+ANSI-free canonical text written to the binary stdout stream as UTF-8/no BOM/LF,
+independent of the Python text wrapper's encoding and newline handling; text-only
+capture streams receive the same string. Shell decoding/re-encoding is outside this
 transport. Paging requires stdin/stdout TTY and honors `-n`/`PAGER`; less uses `-FRX`
 and UTF-8, more uses plain platform encoding. Startup failure displays directly;
 normal quit and downstream pipe closure return 0.
 
-File destinations use invocation cwd and one local timestamp, support `~`, preserve
-custom names and reject collisions without `-w`. Collection/budget passes before
+File destinations use invocation cwd and one local timestamp, with the format's
+`.md`, `.xml` or `.json` suffix for bare `-f`. They support `~`, preserve custom
+names and reject collisions without `-w`. Collection/budget passes before
 creating parents or writing UTF-8/no BOM/LF. Exclusive creation cleans failures;
 overwrites finish a same-directory temporary file before replacing the original.
 A failing destination returns 1 and reports already completed operations without
