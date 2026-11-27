@@ -241,6 +241,7 @@ pylistall -r -o -f context.md -w
 * `json` → 以两个空格缩进的单个对象，包含 `project`、`path`、`tree`、`git`（`path`、
   `log`）与 `files`（`path`、`language`、`encoding`、`truncated`、`error`、`content`）。
   未展开的二进制文件 `content` 为 `null`。脚本与解析器请使用此格式。
+  名称中若含孤立代理字符，解析后的 JSON 会将其显示为 `\udcff` 这类可见转义。
 
 XML 与 JSON 在终端按规范文本直接展示或分页，不加颜色；裸 `-f` 对它们使用 `.xml` 或
 `.json` 扩展名。

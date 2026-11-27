@@ -49,7 +49,8 @@ also derive root variants; custom rules do not. `*.py` matches names at every
 level; `src/*.py` can match deeper paths. This is not Git ignore syntax.
 Each rule set is compiled once: after `os.path.normcase`, exact names use a set and
 globs share one alternation of `fnmatch.translate` expressions, so results equal
-per-rule `fnmatch.fnmatch`. Resolved ancestor checks are cached per directory.
+per-rule `fnmatch.fnmatch`. The target's ancestry is walked iteratively, with
+bounded per-directory results shared by lookups for the same root and rules.
 
 Logical omission precedes target checks. A directory's name, relative path or
 relative path with trailing `/` can prune it. `src/**` and `src/` prune `src`,
@@ -122,9 +123,11 @@ as ordered pieces (start, group start, entries, empty marker, group end, end) wh
 concatenation is the canonical text, so collection and `render()` agree exactly.
 Disabled parts are absent in every format. XML uses tags with escaped attribute
 values and verbatim bodies; it targets prompts and is not guaranteed to be
-well-formed XML. JSON pieces equal `json.dumps(indent=2, ensure_ascii=False)` plus a
-final newline; entries are indented at structural newlines only, because strings
-escape theirs while `str.splitlines()` would also split on U+2028 and similar.
+well-formed XML. JSON uses `json.dumps(indent=2, ensure_ascii=False)` and a final
+newline. Surrogate code points become visible escapes in the parsed string so
+the serialized text can be encoded as UTF-8 and read by strict Unicode parsers.
+Entries are indented only at structural newlines (`\n`). Unicode separators
+such as U+2028 remain inside string values.
 
 `OutputBuilder` counts final UTF-8 bytes in the selected format, including titles,
 tags, labels, dynamic fences and truncation. Each format supplies a lower bound for

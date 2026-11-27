@@ -14,7 +14,7 @@ Maintainers follow the [release guide](docs/releasing.md).
   tags with verbatim bodies; JSON is one indented object for scripts. Budgets, dry-run
   sizes and the largest-entry list follow the selected format, bare `-f` uses the
   matching suffix, and bare `-o` also omits earlier `.xml` and `.json` outputs.
-  Markdown remains the default and is unchanged.
+  Markdown remains the default.
 - Report a rough token estimate in dry runs and in saved/copied messages, and list
   the five largest Files entries with bytes, share and estimate in dry runs.
 
@@ -25,6 +25,11 @@ Maintainers follow the [release guide](docs/releasing.md).
 - Compile include, omit and binary rules once and cache resolved ancestor checks.
   Matching is unchanged; in a Linux benchmark with 20,000 files and bare `-o`, a
   full collection is about 4x faster.
+
+### Fixed
+
+- Keep exclusion checks working in deeply nested directories on Python 3.9.
+- Export readable UTF-8 JSON when filesystem names contain unpaired surrogates.
 
 ### Development
 

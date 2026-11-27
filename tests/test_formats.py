@@ -14,6 +14,7 @@ from pylistall.output import (
     estimate_tokens,
     render,
 )
+from pylistall.selection import SelectedFile
 
 JSON = FORMATS["json"]
 XML = FORMATS["xml"]
@@ -157,6 +158,30 @@ def test_incremental_output_is_exact_at_every_budget_boundary(
     assert copied == []
     if name == "json":
         json.loads(text)
+
+
+def test_json_exports_surrogate_names_at_exact_budget(tmp_path, monkeypatch, capsys):
+    root = tmp_path / "project"
+    root.mkdir()
+    source = root / "source.txt"
+    source.write_text("中文🙂", encoding="utf-8")
+    # Reproduce what the filesystem can return, even where creating such a
+    # filename is unsupported. The CLI still reads and exports a real file.
+    selected = SelectedFile(source, source.relative_to(root), "name\udcff.txt")
+    monkeypatch.setattr(cli, "iter_selected_files", lambda *args, **kwargs: [selected])
+    args = [str(root), "-F", "json"]
+
+    assert cli.main(args) == 0
+    exported = capsys.readouterr().out.encode("utf-8")
+    entry = json.loads(exported)["files"][0]
+    assert entry["path"] == r"name\udcff.txt"
+    assert entry["content"] == "中文🙂"
+
+    destination = tmp_path / "result.json"
+    assert cli.main([*args, "-M", str(len(exported) - 1), "-f", str(destination)]) == 1
+    assert not destination.exists()
+    assert cli.main([*args, "-M", str(len(exported)), "-f", str(destination)]) == 0
+    assert destination.read_bytes() == exported
 
 
 @pytest.mark.parametrize("name", sorted(FORMATS))

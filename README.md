@@ -259,7 +259,8 @@ UTF-8/LF, and share `-M` budgets and dry-run sizes.
 * `json` → one object indented by two spaces, with `project`, `path`, `tree`,
   `git` (`path`, `log`) and `files` (`path`, `language`, `encoding`, `truncated`,
   `error`, `content`). `content` is `null` for an unexpanded binary. Use this
-  format for scripts and parsers.
+  format for scripts and parsers. If a name contains an unpaired surrogate,
+  the parsed JSON shows a visible escape such as `\udcff` in its place.
 
 XML and JSON are displayed or paged as their canonical text, without colors.
 Bare `-f` uses a `.xml` or `.json` extension for them.

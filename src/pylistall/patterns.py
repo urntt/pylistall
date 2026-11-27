@@ -11,6 +11,7 @@ from pathlib import Path
 
 # Characters that give fnmatch patterns a meaning beyond exact equality.
 GLOB_CHARACTERS = frozenset("*?[")
+DIRECTORY_CACHE_SIZE = 4096
 
 DEFAULT_OMIT_PATTERNS: tuple[str, ...] = (
     # Git
@@ -163,21 +164,43 @@ def _relative_to_root(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
-@functools.lru_cache(maxsize=4096)
+@functools.lru_cache(maxsize=8)
+def _directory_cache(root: Path, patterns: tuple[str, ...]) -> dict[Path, bool]:
+    """Keep directory results separate for each collection root and rule set."""
+    return {}
+
+
 def _directory_chain_omitted(
     directory: Path, root: Path, patterns: tuple[str, ...]
 ) -> bool:
-    """Check a directory and its ancestors up to the root; shared by siblings."""
-    if directory == root or directory == directory.parent:
-        return False
-    if omitted(
-        directory.name,
-        _relative_to_root(directory, root),
-        patterns,
-        directory=True,
-    ):
-        return True
-    return _directory_chain_omitted(directory.parent, root, patterns)
+    """Walk ancestors iteratively and cache their results for reuse."""
+    cache = _directory_cache(root, patterns)
+    visited = []
+    result = False
+    while directory != root:
+        cached = cache.get(directory)
+        if cached is not None:
+            result = cached
+            break
+        parent = directory.parent
+        if directory == parent:
+            break
+        if len(visited) < DIRECTORY_CACHE_SIZE:
+            visited.append(directory)
+        if omitted(
+            directory.name,
+            _relative_to_root(directory, root),
+            patterns,
+            directory=True,
+        ):
+            result = True
+            break
+        directory = parent
+    if visited:
+        if len(cache) + len(visited) > DIRECTORY_CACHE_SIZE:
+            cache.clear()
+        cache.update(dict.fromkeys(visited, result))
+    return result
 
 
 def target_omitted(

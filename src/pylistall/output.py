@@ -242,12 +242,18 @@ class XmlFormat:
         return len(self.entry(part, block, 0).encode("utf-8")) - 1
 
 
+_SURROGATES = re.compile(r"[\ud800-\udfff]")
+
+
 def _json(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, indent=2)
+    text = json.dumps(value, ensure_ascii=False, indent=2)
+    # Emit a literal backslash in the parsed value, so readers never need to
+    # accept an unpaired surrogate as a Unicode character.
+    return _SURROGATES.sub(lambda match: rf"\\u{ord(match[0]):04x}", text)
 
 
 class JsonFormat:
-    """One JSON object, identical to ``json.dumps(indent=2, ensure_ascii=False)``."""
+    """One UTF-8 JSON object with readable Unicode and visible surrogate escapes."""
 
     name = "json"
     label = "JSON output"

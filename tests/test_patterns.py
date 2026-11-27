@@ -114,6 +114,14 @@ def test_target_checks_match_previous_implementation(tmp_path, relative, directo
     assert not patterns.target_omitted(root, root, RULES, directory=True)
 
 
+def test_target_checks_deep_ancestor_chain_without_recursion(tmp_path):
+    root = tmp_path / "root"
+    target = (root / "excluded").joinpath(*(["d"] * 550), "source.py")
+
+    assert not patterns.target_omitted(target, root, ("unmatched",))
+    assert patterns.target_omitted(target, root, ("excluded",))
+
+
 @pytest.mark.parametrize(
     "value", ["plain.py", "中文🙂", "a\tb", "nbsp\u00a0name", "zero\u200bwidth", "\x1b"]
 )
