@@ -47,6 +47,9 @@ Repeated/comma-separated rules are trimmed and deduplicated. Only bare `-o` enab
 defaults; mixing bare and custom omissions takes the union. Default `**/` rules
 also derive root variants; custom rules do not. `*.py` matches names at every
 level; `src/*.py` can match deeper paths. This is not Git ignore syntax.
+Each rule set is compiled once: after `os.path.normcase`, exact names use a set and
+globs share one alternation of `fnmatch.translate` expressions, so results equal
+per-rule `fnmatch.fnmatch`. Resolved ancestor checks are cached per directory.
 
 Logical omission precedes target checks. A directory's name, relative path or
 relative path with trailing `/` can prune it. `src/**` and `src/` prune `src`,

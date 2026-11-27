@@ -123,6 +123,9 @@ Traversal tests create real links in temporary directories, including Windows
 junctions. Symbolic-link tests skip only when Windows denies the required link
 privilege. They cover external targets, ancestor cycles, repeated aliases,
 broken links, exclusion consistency, and nested enumeration failures.
+Pattern tests compare compiled rule sets and cached ancestor checks with per-rule
+`fnmatch` and the previous ancestor loop, so every CI platform verifies its own
+case and separator normalization.
 
 ### Collection and terminal acceptance
 

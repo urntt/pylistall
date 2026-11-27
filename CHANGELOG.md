@@ -8,6 +8,12 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ## [Unreleased]
 
+### Changed
+
+- Compile include, omit and binary rules once and cache resolved ancestor checks.
+  Matching is unchanged; in a Linux benchmark with 20,000 files and bare `-o`, a
+  full collection is about 4x faster.
+
 ## [2.1.0]
 
 ### Added
