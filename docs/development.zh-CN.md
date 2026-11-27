@@ -15,7 +15,7 @@ pylistall/
 ├── CHANGELOG*.md              双语版本变更
 ├── VISION*.md                 产品方向
 ├── docs/                      双语开发与架构文档
-├── .github/                   CI 工作流与双语 pull request 模板
+├── .github/                   CI／发布工作流、Dependabot 与双语 PR 模板
 ├── src/pylistall/              CLI、模式、共享遍历、输出、进度、目的地、Git、剪贴板
 ├── tests/                     行为与回归测试
 ├── scripts/                   统一检查、CI 矩阵与 wheel 冒烟验证
@@ -212,6 +212,12 @@ uv run --locked python scripts/check.py
 也要检查最低 Python 对应的条件版本。`uv lock --check` 可验证锁文件是否最新，
 不会接受变更。不要手工修改解析条目，也不要用 `--frozen` 替代 `--locked`
 来绕过配置与锁文件不一致的问题。
+
+[Dependabot](../.github/dependabot.yml) 每月为 GitHub Actions 与 uv 锁文件分组提交
+pull request，新版本发布后先冷却七天。uv 条目使用 `lockfile-only`，不修改
+`pyproject.toml` 中声明的最低版本。像其他变更一样审查这些 pull request，最新 `CI`
+通过后才合并。工作流中固定的 uv 版本不由 Dependabot 更新，需与本指南记录的已验证
+版本一起修改。
 
 ## 贡献流程
 

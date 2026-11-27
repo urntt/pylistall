@@ -1,0 +1,23 @@
+# Dependency update pull requests. They run the same CI as every other change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: monthly
+    # Keep declared minimum versions; only refresh resolutions in uv.lock.
+    versioning-strategy: lockfile-only
+    cooldown:
+      default-days: 7
+    groups:
+      uv:
+        patterns: ["*"]

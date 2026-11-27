@@ -28,6 +28,8 @@ Maintainers follow the [release guide](docs/releasing.md).
 
 ### Development
 
+- Add Dependabot for GitHub Actions and the uv lock, grouped monthly with a
+  seven-day cooldown and lockfile-only uv updates.
 - Enable Ruff `UP`, `B`, `SIM`, `C4` and `RUF` rules and apply their fixes, including
   `X | None` annotations that remain compatible with Python 3.9.
 

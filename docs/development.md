@@ -16,7 +16,7 @@ pylistall/
 ├── CHANGELOG*.md              bilingual version changes
 ├── VISION*.md                 product direction
 ├── docs/                      development and architecture, in both languages
-├── .github/                   CI workflow and bilingual pull request template
+├── .github/                   CI/release workflows, Dependabot and bilingual PR template
 ├── src/pylistall/              CLI, traversal, model/rendering, destinations, selection, Git, clipboard
 ├── tests/                     behavior and regression tests
 ├── scripts/                   unified checks, CI matrix and wheel smoke test
@@ -240,6 +240,13 @@ when all dependency updates are in scope. Inspect conditional versions for the
 minimum Python too. `uv lock --check` verifies freshness without accepting changes.
 Do not edit resolved lock entries manually or replace `--locked` with `--frozen`
 to bypass an inconsistent project configuration.
+
+[Dependabot](../.github/dependabot.yml) opens monthly grouped pull requests for
+GitHub Actions and the uv lock, after a seven-day cooldown for new releases. The
+uv entry uses `lockfile-only`, so declared minimum versions in `pyproject.toml`
+stay unchanged. Review these pull requests like any other change and merge only
+after the latest `CI` run passes. The uv version pinned in workflows is not updated
+by Dependabot; change it together with the validated version in this guide.
 
 ## Contribution workflow
 

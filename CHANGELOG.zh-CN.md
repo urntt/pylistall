@@ -26,6 +26,7 @@
 
 ### 开发
 
+- 新增 Dependabot，按月分组更新 GitHub Actions 与 uv 锁文件，冷却七天，uv 只更新锁文件。
 - 启用 Ruff `UP`、`B`、`SIM`、`C4` 与 `RUF` 规则并应用修复，包括仍兼容 Python 3.9 的
   `X | None` 注解。
 
