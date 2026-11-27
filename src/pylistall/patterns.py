@@ -6,8 +6,8 @@ import fnmatch
 import functools
 import os
 import re
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
 
 # Characters that give fnmatch patterns a meaning beyond exact equality.
 GLOB_CHARACTERS = frozenset("*?[")
@@ -108,13 +108,13 @@ class PatternMatcher:
     share one compiled alternation of ``fnmatch.translate`` expressions.
     """
 
-    __slots__ = ("literals", "expression")
+    __slots__ = ("expression", "literals")
 
     def __init__(self, patterns: tuple[str, ...]):
         normalized = [os.path.normcase(pattern) for pattern in patterns]
         globs = [p for p in normalized if GLOB_CHARACTERS.intersection(p)]
         self.literals = frozenset(normalized).difference(globs)
-        self.expression: Optional[re.Pattern[str]] = (
+        self.expression: re.Pattern[str] | None = (
             re.compile("|".join(f"(?:{fnmatch.translate(p)})" for p in globs))
             if globs
             else None

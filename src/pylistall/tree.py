@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from pylistall.names import visible_name
 from pylistall.patterns import matches_name
@@ -13,7 +13,7 @@ from pylistall.traversal import FilesystemEntry, TraversalResult, scan_directory
 def render_tree(
     snapshot: TraversalResult,
     include: tuple[str, ...] = (),
-    report: Optional[Callable[..., None]] = None,
+    report: Callable[..., None] | None = None,
 ) -> str:
     """Render iteratively, including unexpanded links and failed entries."""
     children: dict[Path, list[FilesystemEntry]] = {}
@@ -61,9 +61,9 @@ def build_tree_text(
     recursive: bool,
     follow_links: bool = False,
     *,
-    snapshot: Optional[TraversalResult] = None,
+    snapshot: TraversalResult | None = None,
     include: tuple[str, ...] = (),
-    report: Optional[Callable[..., None]] = None,
+    report: Callable[..., None] | None = None,
 ) -> str:
     """Render an existing scan, or discover entries for standalone callers."""
     if snapshot is None:

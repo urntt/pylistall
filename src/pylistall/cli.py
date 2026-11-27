@@ -5,10 +5,11 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable
 
 from pylistall import gitlog
 from pylistall.destinations import (
@@ -69,9 +70,9 @@ def _build_output(
     git_options: GitLogOptions,
     *,
     disabled: tuple[str, ...] = (),
-    maximum: Optional[int] = None,
-    excluded: Optional[Path] = None,
-    report: Optional[Callable[..., None]] = None,
+    maximum: int | None = None,
+    excluded: Path | None = None,
+    report: Callable[..., None] | None = None,
 ) -> OutputResult:
     """Collect enabled parts once, checking budgets before any delivery."""
     root = root.resolve(strict=True)
@@ -348,7 +349,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Validate combinations before collecting any data."""
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -366,7 +367,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return args
 
 
-def _main(argv: Optional[Sequence[str]] = None) -> int:
+def _main(argv: Sequence[str] | None = None) -> int:
     """Collect once and independently report the outcome of each destination."""
     args = parse_args(argv)
     root = Path(args.path).expanduser()
@@ -451,7 +452,7 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
     return int(failed)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Translate cancellation into the conventional status after resource cleanup."""
     try:
         return _main(argv)

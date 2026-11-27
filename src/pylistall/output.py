@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from pylistall.names import inline_code, visible_name
 
@@ -45,20 +44,20 @@ class OutputTooLarge(Exception):
 @dataclass(frozen=True)
 class ContentBlock:
     title: str
-    text: Optional[str]
+    text: str | None
     language: str = "text"
-    encoding: Optional[str] = None
+    encoding: str | None = None
     truncated: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass(frozen=True)
 class OutputDocument:
     project_name: str
-    path: Optional[str]
-    tree: Optional[str]
-    git: Optional[tuple[ContentBlock, ...]]
-    files: Optional[tuple[ContentBlock, ...]]
+    path: str | None
+    tree: str | None
+    git: tuple[ContentBlock, ...] | None
+    files: tuple[ContentBlock, ...] | None
     warnings: tuple[str, ...] = ()
     skipped_count: int = 0
     discovered_count: int = 0
@@ -103,7 +102,7 @@ def block_markdown(block: ContentBlock) -> str:
     return header + encoding + fenced(block.text, block.language) + marker
 
 
-def introduction(name: str, path: Optional[str], tree: Optional[str]) -> str:
+def introduction(name: str, path: str | None, tree: str | None) -> str:
     text = f"# {inline_code(name)}\n"
     lines = []
     if path is not None:
@@ -132,7 +131,7 @@ def empty_group(part: str) -> str:
 class MarkdownBuilder:
     """Check before accepting each complete section and each streamed body."""
 
-    def __init__(self, maximum: Optional[int] = None):
+    def __init__(self, maximum: int | None = None):
         self.maximum = maximum
         self.size = 0
         self.chunks: list[str] = []
@@ -147,7 +146,7 @@ class MarkdownBuilder:
         self.size += size
         self.chunks.append(text)
 
-    def body_checker(self, title: str, language: str, encoding: Optional[str] = None):
+    def body_checker(self, title: str, language: str, encoding: str | None = None):
         # A trailing body newline can remove one formatting byte. Longer fences
         # are checked exactly when the complete block is appended.
         overhead = (

@@ -77,7 +77,10 @@ It runs Ruff lint, Ruff format verification, and pytest, in that order, with the
 active Python interpreter. It stops at the first failure and returns a nonzero
 status. The script locates the repository root itself; configuration lives in
 `pyproject.toml`. Ruff targets Python 3.9, uses an 88-character line width, and
-checks `E4`, `E7`, `E9`, `F`, and `I`, including import ordering.
+checks `E4`, `E7`, `E9`, `F`, `I` (import ordering), `UP` (syntax upgrades for the
+minimum Python), `B` (likely bugs), `SIM` (simplifications), `C4` (comprehensions)
+and `RUF`. Source modules use `from __future__ import annotations`, so annotations
+such as `str | None` remain valid on Python 3.9.
 
 Apply intentional formatting and import fixes, then rerun the entry point:
 

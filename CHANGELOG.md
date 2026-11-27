@@ -14,6 +14,11 @@ Maintainers follow the [release guide](docs/releasing.md).
   Matching is unchanged; in a Linux benchmark with 20,000 files and bare `-o`, a
   full collection is about 4x faster.
 
+### Development
+
+- Enable Ruff `UP`, `B`, `SIM`, `C4` and `RUF` rules and apply their fixes, including
+  `X | None` annotations that remain compatible with Python 3.9.
+
 ## [2.1.0]
 
 ### Added

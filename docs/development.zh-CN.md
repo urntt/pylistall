@@ -70,8 +70,10 @@ uv run --locked python scripts/check.py
 
 它依次使用当前 Python 解释器执行 Ruff 规则检查、Ruff 格式检查和 pytest，
 首个失败即停止并返回非零状态。脚本自行定位仓库根目录，配置保存在 `pyproject.toml`。
-Ruff 目标语法为 Python 3.9，行宽为 88，启用 `E4`、`E7`、`E9`、`F`、`I`，
-包含导入排序。
+Ruff 目标语法为 Python 3.9，行宽为 88，启用 `E4`、`E7`、`E9`、`F`、`I`（导入排序）、
+`UP`（按最低 Python 升级语法）、`B`（潜在缺陷）、`SIM`（简化）、`C4`（推导式）和 `RUF`。
+源码模块使用 `from __future__ import annotations`，因此 `str | None` 等注解在
+Python 3.9 上仍然有效。
 
 有意应用格式与导入修复后，重新运行统一入口：
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import io
 import locale
@@ -12,7 +13,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from pylistall.names import visible_name
 from pylistall.output import BINARY_PLACEHOLDER, GROUPS, TRUNCATED, OutputDocument
@@ -33,8 +34,8 @@ def render_terminal(
     *,
     width: int,
     color: bool,
-    report: Optional[Callable[..., None]] = None,
-) -> Optional[str]:
+    report: Callable[..., None] | None = None,
+) -> str | None:
     """Import Rich lazily; missing Rich or transitive imports silently fall back."""
     try:
         from rich.console import Console
@@ -114,7 +115,7 @@ def _command(args: list[str]) -> PagerCommand:
     return PagerCommand(tuple(args), kind)
 
 
-def choose_pager() -> Optional[PagerCommand]:
+def choose_pager() -> PagerCommand | None:
     """Honor PAGER, then locate less (including Git for Windows), then more."""
     configured = os.environ.get("PAGER")
     if configured is not None:
@@ -178,10 +179,8 @@ def run_pager(text: str, command: PagerCommand) -> bool:
         raise
     finally:
         if process.stdin is not None:
-            try:
+            with contextlib.suppress(BrokenPipeError):
                 process.stdin.close()
-            except BrokenPipeError:
-                pass
     return getattr(process, "returncode", 0) in NORMAL_PAGER_EXIT_CODES
 
 
@@ -211,10 +210,8 @@ def _write_stdout(text: str) -> None:
             with open(os.devnull, "w") as sink:
                 os.dup2(sink.fileno(), descriptor)
         except (OSError, AttributeError, io.UnsupportedOperation):
-            try:
+            with contextlib.suppress(BrokenPipeError):
                 sys.stdout.close()
-            except BrokenPipeError:
-                pass
 
 
 def display(
